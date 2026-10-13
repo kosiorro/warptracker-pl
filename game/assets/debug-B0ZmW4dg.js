@@ -1,1 +1,0 @@
-import{n as e,r as t,t as n}from"./index-FsptR_Zn.js";function r(){window.__WTdebug={THREE:t,instantiate:e,findBone:n}}export{r as installDebug};
