@@ -12,7 +12,7 @@ Jesteś Tropicielem. Wyrwy — strumienie zła — rozdzierają świat. Wybierz 
 | 🎒 Sakwa | — | 20 miejsc; gorsze dropy lecą do sakwy zamiast się rozpadać, a zdjęte itemy wracają do niej |
 | 🧍 Karta postaci | `C` / `I` | paperdoll ze slotami Broń / Zbroja / Talizman + ikony SVG (gem kolorowany wg rzadkości) |
 | ⚔️ Wyposażenie startowe | — | świeże postaci dostają miecz (+12 obr.), kirys (+15 życia) i talizman (+8 many) |
-| 🛠️ Panel admina | `P` | pełny edytor przedmiotów: twórz, edytuj, zakładaj, usuwaj — zmiany działają natychmiast |
+| 🛠️ Panel admina | `P` | baza przedmiotów: twórz/edytuj/zakładaj/upuszczaj w świecie, podgląd 3D modeli, eksport/import JSON, własne dropy przy zabójstwach |
 | 🌿 Trawa | — | proceduralna tekstura podłoża (szum 3-oktawowy, mroźna zieleń bagien) |
 | 💪 Balans | — | bazowe obrażenia podwojone: `(26 + 6×poziom) × mnożnik klasy` |
 
@@ -39,7 +39,8 @@ game/                  → gotowa gra (odpal game/index.html przez serwer)
   index.html
   assets/
     index-FsptR_Zn.js  → loader: składa 12 części w jeden moduł i startuje grę
-    parts/p01–p12.js   → spatchowany bundle gry (PL + wszystkie mody)
+    admin.js           → panel admina (P): baza przedmiotów + podgląd 3D
+    parts/p01–p12.js   → spatchowany bundle gry (PL + mody)
     index-BEkZlT_U.css → style
   models/b64/          → modele 3D (base64+gzip; loader dekoduje je w locie)
                        (opcjonalnie: prawdziwe pliki GLB przez pobierz-modely.sh)
