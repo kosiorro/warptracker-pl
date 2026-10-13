@@ -1,6 +1,32 @@
 // Warptracker PL — loader: składa bundle gry z części (assets/parts/).
 // Repozytorium trzyma kod w małych plikach; tu sklejamy je w jeden moduł.
 (async function () {
+  // --- fallback modeli 3D: gdy models/*.glb zwraca 404, sklejamy je z base64+gzip
+  // zapisanych w repo (models/b64/*.NNN.b64). Dzięki temu gra działa od razu po git clone.
+  var origFetch = window.fetch.bind(window);
+  window.fetch = function (u, o) {
+    var m = typeof u === 'string' ? u.match(/models\/([a-z]+)\.glb$/) : null;
+    if (!m) return origFetch(u, o);
+    return origFetch(u, o).then(function (res) {
+      if (res.ok) return res;
+      return (async function () {
+        var chunks = [];
+        for (var i = 1; ; i++) {
+          var id = ('00' + i).slice(-3);
+          var r = await origFetch('models/b64/' + m[1] + '.' + id + '.b64');
+          if (!r.ok) break;
+          chunks.push(await r.text());
+        }
+        if (!chunks.length) return res; // brak fallbacku — pokaż oryginalny 404
+        var bin = atob(chunks.join(''));
+        var bytes = new Uint8Array(bin.length);
+        for (var j = 0; j < bin.length; j++) bytes[j] = bin.charCodeAt(j);
+        var stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+        return new Response(stream, { headers: { 'Content-Type': 'application/octet-stream' } });
+      })();
+    });
+  };
+
   var N = 12;
   var parts = [];
   for (var i = 1; i <= N; i++) {
