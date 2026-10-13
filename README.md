@@ -40,6 +40,7 @@ game/                  → gotowa gra (odpal game/index.html przez serwer)
   assets/
     index-FsptR_Zn.js  → loader: składa 12 części w jeden moduł i startuje grę
     admin.js           → panel admina (P): baza przedmiotów + podgląd 3D
+    (własne modele: game/models/NAZWA.glb + lista w panelu — patrz niżej)
     parts/p01–p12.js   → spatchowany bundle gry (PL + mody)
     index-BEkZlT_U.css → style
   models/b64/          → modele 3D (base64+gzip; loader dekoduje je w locie)
@@ -55,6 +56,15 @@ pobierz-modely.sh|.bat → pobiera 8 modeli GLB z warptracker.com (CC0)
 ## GitHub Pages (opcjonalnie)
 
 Gra może działać też online przez GitHub Pages. Pages serwuje tylko katalog główny repo, więc trzeba przekopiować zawartość `game/` do roota (index.html + assets/ + models/ — modele GLB trzeba wtedy wrzucić do repo ręcznie, bo skrypt tylko pobiera). Potem: **Settings → Pages → Deploy from a branch → main / (root)**.
+
+## Własne modele 3D (.glb)
+
+1. Wrzuć plik do `game/models/` — nazwa bez rozszerzenia staje się identyfikatorem, np. `game/models/moja-bron.glb`
+2. Otwórz panel admina (**P**) → sekcja **Modele 3D (własne)** → wpisz `moja-bron` i kliknij **+**
+3. Odśwież grę (F5) — model zostanie załadowany razem z resztą i pojawi się na liście **model 3D** przy przedmiotach
+4. Wybierz go w edytorze przedmiotu — podgląd 3D od razu pokaże Twój model
+
+Brakujący plik `.glb` jest pomijany z ostrzeżeniem w konsoli (gra nie odmówi startu).
 
 ## Sterowanie
 

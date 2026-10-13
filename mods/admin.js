@@ -7,6 +7,16 @@
   var STATS = ['dmg', 'hp', 'speed', 'mana', 'regen']
   var STAT_PL = { dmg: 'obrażeń', hp: 'życia', speed: '% szybk. ruchu', mana: 'many', regen: 'życia/s' }
   var DB_KEY = 'wt.db'
+  var MODELS_KEY = 'wt.models'
+  var BASE_MODELS = ['hero', 'knight', 'sword', 'helmet', 'skeleton', 'bat', 'ghost', 'demon']
+  function loadModels() {
+    try {
+      var a = JSON.parse(localStorage.getItem(MODELS_KEY) || '[]')
+      return Array.isArray(a) ? a.filter(function (x) { return typeof x === 'string' && x }) : []
+    } catch (e) { return [] }
+  }
+  function saveModels(a) { try { localStorage.setItem(MODELS_KEY, JSON.stringify(a)) } catch (e) {} }
+  function allModels() { return BASE_MODELS.concat(loadModels()) }
   var PRESETS = [
     { name: 'Ostrze Wyrwy', slot: 'weapon', rarity: 'unique', affixes: [{ stat: 'dmg', value: 18 }, { stat: 'speed', value: 8 }] },
     { name: 'Kirys z Pustego Kurhanu', slot: 'armor', rarity: 'rare', affixes: [{ stat: 'hp', value: 40 }, { stat: 'regen', value: 1.5 }] },
@@ -107,6 +117,9 @@
     '<div class="list" id="wt-adm-list"></div>' +
     '<div class="btns"><button id="wt-adm-new">Nowy</button></div>' +
     '<div class="btns"><button id="wt-adm-import" class="gold">Import JSON</button><button id="wt-adm-export" class="gold">Eksport JSON</button></div>' +
+    '<div class="sec" style="padding-left:0">Modele 3D (własne)</div>' +
+    '<div class="list" id="wt-adm-models" style="max-height:16vh"></div>' +
+    '<div style="display:flex;gap:6px"><input type="text" id="wt-adm-model-name" placeholder="nazwa pliku bez .glb" style="flex:1;background:rgba(20,12,32,.9);border:1px solid #3f2a55;color:#e9d5ff;border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit"><button id="wt-adm-model-add" style="min-width:0;padding:6px 10px">+</button></div>' +
     '</div>' +
     '<div class="right">' +
     '<div class="edit">' +
@@ -114,6 +127,7 @@
     '<label>nazwa</label><input type="text" id="wt-adm-name" maxlength="80">' +
     '<div style="display:flex;gap:8px"><div style="flex:1"><label>slot</label><select id="wt-adm-slot"><option value="weapon">Broń</option><option value="armor">Zbroja</option><option value="charm">Talizman</option></select></div>' +
     '<div style="flex:1"><label>rzadkość</label><select id="wt-adm-rar"><option value="common">zwykły</option><option value="magic">magiczny</option><option value="rare">rzadki</option><option value="unique">unikat</option></select></div></div>' +
+    '<label>model 3D (podgląd)</label><select id="wt-adm-model"></select>' +
     '<label>afiksy (1–4, zaznacz i ustaw wartość)</label><div class="affs" id="wt-adm-affs"></div>' +
     '</div>' +
     '<div class="prev" id="wt-adm-prev"><div class="pl" id="wt-adm-pl">—</div></div>' +
@@ -128,7 +142,7 @@
     '<div class="msg" id="wt-adm-msg"></div>' +
     '<div class="foot"><span>dropy z bazy przy zabójstwach:</span><input type="range" id="wt-adm-chance" min="0" max="100" step="5"><span id="wt-adm-chance-l"></span></div>' +
     '</div></div>' +
-    '<div class="hint">P / ESC — zamknij panel · przeciągnij podgląd 3D, żeby obrócić model · przedmioty zapisują się w przeglądarce (localStorage)</div>' +
+    '<div class="hint">P / ESC — zamknij · obracaj podgląd myszą · własne modele: wrzuć plik <b>NAZWA.glb</b> do <b>game/models/</b>, dodaj „NAZWA” w sekcji Modele 3D i odśwież grę (F5)</div>' +
     '</div>'
   document.body.appendChild(panel)
 
@@ -176,10 +190,10 @@
     var rar = RAR[item.rarity] || '#d6d3d1'
     var root = new THREE.Group()
     var db = window.__WTdebug
-    var modelName = item.slot === 'weapon' ? 'sword' : item.slot === 'armor' ? 'helmet' : null
+    var modelName = item.model || (item.slot === 'weapon' ? 'sword' : item.slot === 'armor' ? 'helmet' : null)
     var obj = null
     if (modelName) {
-      try { obj = db.instantiate(modelName, 1.5).root } catch (e) { obj = null }
+      try { obj = db.instantiate(modelName, 1.5).root } catch (e) { obj = null; $('wt-adm-pl').textContent = 'model „' + modelName + '” niezaładowany — sprawdź plik models/' + modelName + '.glb' }
     }
     if (!obj) {
       // talizman (albo fallback): obracający się klejnot
@@ -248,7 +262,17 @@
   }
   buildAffixGrid()
 
+  function fillModelSelect(sel) {
+    var cur = sel || ''
+    var g = $('wt-adm-model')
+    var html = '<option value="">(auto wg slotu)</option>'
+    allModels().forEach(function (m) {
+      html += '<option value="' + m + '"' + (m === cur ? ' selected' : '') + '>' + m + (BASE_MODELS.indexOf(m) >= 0 ? ' (wbudowany)' : '') + '</option>'
+    })
+    g.innerHTML = html
+  }
   function fillForm(item) {
+    fillModelSelect(item.model || '')
     $('wt-adm-name').value = item.name
     $('wt-adm-slot').value = item.slot
     $('wt-adm-rar').value = item.rarity
@@ -265,6 +289,8 @@
 
   function readForm() {
     var it = { name: $('wt-adm-name').value.trim(), slot: $('wt-adm-slot').value, rarity: $('wt-adm-rar').value, affixes: [] }
+    var mdl = $('wt-adm-model').value
+    if (mdl) it.model = mdl
     STATS.forEach(function (s) {
       if (panel.querySelector('[data-s="' + s + '"]').checked) {
         var v = parseFloat(panel.querySelector('[data-v="' + s + '"]').value)
@@ -442,11 +468,47 @@
   })
 
   // formularz → odśwież podgląd na żywo
-  ;['wt-adm-slot', 'wt-adm-rar', 'wt-adm-name'].forEach(function (id) {
+  ;['wt-adm-slot', 'wt-adm-rar', 'wt-adm-name', 'wt-adm-model'].forEach(function (id) {
     $(id).addEventListener('change', function () {
       showPreview(readForm())
     })
   })
+
+  // ---------- menedżer modeli 3D ----------
+  function renderModels() {
+    var g = $('wt-adm-models')
+    var list = loadModels()
+    var html = ''
+    if (!list.length) html = '<div class="sec" style="letter-spacing:0;text-transform:none;padding:8px 10px">(brak własnych modeli)</div>'
+    list.forEach(function (m) {
+      html += '<div class="row" data-m="' + esc(m) + '"><span class="dot" style="background:#4ade80"></span>' +
+        '<span class="nm">' + esc(m) + '.glb</span><span class="tag" data-mdel="' + esc(m) + '" style="cursor:pointer;color:#f87171">✕</span></div>'
+    })
+    g.innerHTML = html
+    fillModelSelect($('wt-adm-model').value)
+  }
+  $('wt-adm-models').addEventListener('click', function (e) {
+    var del = e.target.getAttribute && e.target.getAttribute('data-mdel')
+    if (!del) return
+    var list = loadModels().filter(function (m) { return m !== del })
+    saveModels(list)
+    renderModels()
+    msg('Usunięto model „' + del + '” — po odświeżeniu (F5) gra przestanie go ładować.')
+  })
+  $('wt-adm-model-add').addEventListener('click', function () {
+    var inp = $('wt-adm-model-name')
+    var name = inp.value.trim().replace(/\.glb$/i, '').replace(/[^a-zA-Z0-9_-]/g, '')
+    if (!name) return msg('Podaj nazwę pliku (bez .glb), np. moja-broń', true)
+    if (BASE_MODELS.indexOf(name) >= 0) return msg('„' + name + '” to model wbudowany.', true)
+    var list = loadModels()
+    if (list.indexOf(name) >= 0) return msg('Model już jest na liście.', true)
+    list.push(name)
+    saveModels(list)
+    inp.value = ''
+    renderModels()
+    msg('Dodano „' + name + '”. Wrzuć plik ' + name + '.glb do game/models/ i odśwież grę (F5).')
+  })
+  $('wt-adm-model-name').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('wt-adm-model-add').click() })
 
   // ---------- dropy z bazy w grze ----------
   function hookDrops() {
@@ -473,6 +535,7 @@
     if (!loot()) return
     panel.classList.add('show')
     renderList()
+    renderModels()
     updateButtons()
     if (!current) {
       var db = loadDB()
