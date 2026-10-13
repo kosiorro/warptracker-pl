@@ -38,13 +38,22 @@ python3 -m http.server 8080   # lub: python -m http.server 8080 / npx serve .
 ```
 game/                  → gotowa gra (odpal game/index.html przez serwer)
   index.html
-  assets/              → kod (JS/CSS, w tym wszystkie mody)
+  assets/
+    index-FsptR_Zn.js  → loader: składa 12 części w jeden moduł i startuje grę
+    parts/p01–p12.js   → spatchowany bundle gry (PL + wszystkie mody)
+    index-BEkZlT_U.css → style
   models/              → modele 3D (generuje skrypt pobierania)
 mods/
   charsheet.js         → czytelne źródło: karta postaci + sakwa + starter
   admin.js             → czytelne źródło: panel admina + trawa
 pobierz-modely.sh|.bat → pobiera 8 modeli GLB z warptracker.com (CC0)
 ```
+
+**Dlaczego parts/?** Bundle gry to ~1 MB zminifikowanego JS — GitHub contents API nie przyjmuje tak dużych plików w jednym kawałku, więc trzymamy go podzielonego na 12 części, a mały loader (`assets/index-FsptR_Zn.js`) skleja je w przeglądarce w Blob-URL i importuje jako moduł. Loader ustawia też `window.__WTdebug` (THREE + pomocniki), więc oryginalny `debug-*.js` nie jest już potrzebny.
+
+## GitHub Pages (opcjonalnie)
+
+Gra może działać też online przez GitHub Pages. Pages serwuje tylko katalog główny repo, więc trzeba przekopiować zawartość `game/` do roota (index.html + assets/ + models/ — modele GLB trzeba wtedy wrzucić do repo ręcznie, bo skrypt tylko pobiera). Potem: **Settings → Pages → Deploy from a branch → main / (root)**.
 
 ## Sterowanie
 
