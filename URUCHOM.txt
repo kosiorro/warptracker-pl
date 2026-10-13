@@ -1,0 +1,20 @@
+Warptracker PL — instrukcja uruchomienia
+=========================================
+
+1. Sklonuj lub pobierz to repozytorium.
+2. Pobierz modele 3D (jednorazowo):
+     Linux/macOS:  ./pobierz-modely.sh
+     Windows:      pobierz-modely.bat
+   (modele są CC0, pochodzą z warptracker.com — 8 plików GLB, ~3 MB)
+3. Wejdź do game/ i odpal serwer HTTP:
+     python3 -m http.server 8080     (Linux/macOS)
+     python -m http.server 8080      (Windows)
+     npx serve .                     (alternatywa z Node.js)
+4. Otwórz w przeglądarce: http://localhost:8080
+
+Sterowanie:
+  WASD - ruch · mysz - celowanie · LPM - atak · SPACE - unik
+  1/2/3 - umiejętności · E - rozmowa · kółko - zoom · M - dźwięk
+  C / I - karta postaci · P - panel admina przedmiotów
+
+Zapis gry, sakwa i ekwipunek żyją w localStorage przeglądarki.
