@@ -24,9 +24,8 @@ Gra wymaga serwowania po HTTP (przeglądarka blokuje WebGL/fetch z `file://`).
 git clone https://github.com/kosiorro/warptracker-pl.git
 cd warptracker-pl/game
 
-# 1. pobierz modele 3D (CC0, ~3 MB) — jednorazowo:
-../pobierz-modely.sh        # Linux/macOS
-# ..\pobierz-modely.bat    # Windows
+# 1. modele 3D są już w repo (base64 w game/models/b64/) — nic nie trzeba pobierać.
+#    (opcjonalnie: ../pobierz-modely.sh pobiera oryginalne pliki GLB bezpośrednio)
 
 # 2. odpal serwer:
 python3 -m http.server 8080   # lub: python -m http.server 8080 / npx serve .
@@ -42,7 +41,8 @@ game/                  → gotowa gra (odpal game/index.html przez serwer)
     index-FsptR_Zn.js  → loader: składa 12 części w jeden moduł i startuje grę
     parts/p01–p12.js   → spatchowany bundle gry (PL + wszystkie mody)
     index-BEkZlT_U.css → style
-  models/              → modele 3D (generuje skrypt pobierania)
+  models/b64/          → modele 3D (base64+gzip; loader dekoduje je w locie)
+                       (opcjonalnie: prawdziwe pliki GLB przez pobierz-modely.sh)
 mods/
   charsheet.js         → czytelne źródło: karta postaci + sakwa + starter
   admin.js             → czytelne źródło: panel admina + trawa
