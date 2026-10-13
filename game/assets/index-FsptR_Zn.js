@@ -35,7 +35,7 @@
     if (!res.ok) throw new Error('brak części bundle: p' + id);
     parts.push(await res.text());
   }
-  var blob = new Blob([parts.join('\n')], { type: 'text/javascript' });
+  var blob = new Blob([parts.join('')], { type: 'text/javascript' });
   var url = URL.createObjectURL(blob);
   var m = await import(url);
   URL.revokeObjectURL(url);
