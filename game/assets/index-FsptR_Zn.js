@@ -43,6 +43,8 @@
   window.__WTdebug = { THREE: m.r, instantiate: m.n, findBone: m.t };
   // panel admina (P): baza przedmiotów + podgląd 3D — osobny moduł
   await import(new URL('admin.js', import.meta.url).href);
+  // mostek dla osobnej strony admina (admin.html): nadpisania dialogów + live-sync
+  await import(new URL('bridge.js', import.meta.url).href);
 })().catch(function (e) {
   console.error('wt-pl loader:', e);
   var st = document.getElementById('loading-status');

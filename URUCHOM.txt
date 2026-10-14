@@ -18,3 +18,6 @@ Sterowanie:
   C / I - karta postaci · P - panel admina przedmiotów
 
 Zapis gry, sakwa i ekwipunek żyją w localStorage przeglądarki.
+
+Panel admina (pełny):  http://localhost:8080/admin.html
+  (dialogi NPC i dropy z bazy — na żywo; postać — po F5 w grze)

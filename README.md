@@ -29,7 +29,8 @@ cd warptracker-pl/game
 
 # 2. odpal serwer:
 python3 -m http.server 8080   # lub: python -m http.server 8080 / npx serve .
-# 3. otwórz: http://localhost:8080
+# 3. gra:      http://localhost:8080
+#    panel admina (osobna strona, pełny): http://localhost:8080/admin.html
 ```
 
 ## Struktura repo
@@ -56,6 +57,17 @@ pobierz-modely.sh|.bat → pobiera 8 modeli GLB z warptracker.com (CC0)
 ## GitHub Pages (opcjonalnie)
 
 Gra może działać też online przez GitHub Pages. Pages serwuje tylko katalog główny repo, więc trzeba przekopiować zawartość `game/` do roota (index.html + assets/ + models/ — modele GLB trzeba wtedy wrzucić do repo ręcznie, bo skrypt tylko pobiera). Potem: **Settings → Pages → Deploy from a branch → main / (root)**.
+
+## Panel admina — osobna strona (`/admin.html`)
+
+Pełna wersja panelu z zakładkami (skrót P w grze zostaje jako szybki edytor przedmiotów):
+- **Przedmioty** — baza, zakładanie, sakwa, import/eksport, podgląd 3D, szansa dropów z bazy (na żywo)
+- **Modele 3D** — lista własnych .glb
+- **Dialogi / NPC** — nadpisywanie kwestii Serry, Marka, Vess i Branna (**na żywo**, bez F5)
+- **Postać** — klasa, poziom, XP, rozdział fabuły, łowy, reset postaci
+- **Kopia / Reset** — eksport i import całego stanu gry
+
+Strona i gra dzielą localStorage (ten sam serwer) — najlepiej trzymać je w dwóch kartach obok siebie. Dialogi i dropy działają natychmiast; postać/ekwipunek wymagają F5 w grze. Podgląd 3D na stronie korzysta z CDN three.js (bez internetu reszta panelu działa normalnie).
 
 ## Własne modele 3D (.glb)
 
