@@ -92,6 +92,7 @@ Brakujący plik `.glb` jest pomijany z ostrzeżeniem w konsoli (gra nie odmówi 
 ## Menu gry, sklep i zapisy
 
 - **ESC** otwiera menu gry: wróć do gry, karta postaci, zapis gry (3 sloty), wczytanie, dźwięk, nowa gra.
+- **Osada Żarowarta**: start w obozie jak z Diablo 2 — palisada z bramą, ognisko z migoczącym światłem, namioty, skrzynie, sztandar. Wrogowie nie wchodzą do obozu (spawny są odsuwane).
 - **Zapis / wczytanie**: migawka całego stanu (bohater, ekwipunek, sakwa, statystyki, złoto) ląduje w `localStorage` w 3 slotach.
 - **Sklep**: w rozmowie z NPC w mieście pojawia się przycisk **🛒 Handel** — kupuj przedmioty z bazy gry (gamedata.json) za złoto, sprzedawaj zawartość sakwy. Start: 🪙 50.
 - **Tooltipy**: najedź kursorem na przedmiot (karta postaci, sklep, ekwipunek) — zobaczysz nazwę i statystyki.

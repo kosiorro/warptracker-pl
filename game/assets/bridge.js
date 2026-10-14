@@ -453,7 +453,7 @@
     mapEl = document.createElement('div')
     mapEl.id = 'wt-map'
     mapEl.innerHTML = '<div class="mp-box"><div class="mp-title">MAPA ŻAROWARTY</div><canvas width="560" height="560"></canvas>' +
-      '<div class="mp-legend"><b style="color:#c084fc">◆ Ty</b><b style="color:#fbbf24">● NPC</b><b style="color:#ef4444">● wrogowie</b><b style="color:#d6d3d1">♦ łupy</b></div>' +
+      '<div class="mp-legend"><b style="color:#c084fc">◆ Ty</b><b style="color:#fbbf24">● NPC</b><b style="color:#ef4444">● wrogowie</b><b style="color:#d6d3d1">♦ łupy</b><b style="color:#a8845e">◯ osada</b></div>' +
       '<div class="mp-hint">ciemne płyty = nieodkryty teren &middot; TAB — zamknij mapę</div></div>'
     document.body.appendChild(mapEl)
     mapCv = mapEl.querySelector('canvas')
@@ -558,6 +558,34 @@
         ctx.beginPath(); ctx.moveTo(wx + 2, wz + 3); ctx.lineTo(wx + cell - 2, wz + cell - 3); ctx.stroke()
       }
     }
+    // osada — okrąg palisady + podpis
+    var tdx = TOWN.x - cx, tdz = TOWN.z - cz
+    if (Math.sqrt(tdx * tdx + tdz * tdz) < r + TOWN.r + 6) {
+      var tcx = W / 2 + tdx * sc, tcz = H / 2 - tdz * sc
+      ctx.strokeStyle = '#a8845e'
+      ctx.lineWidth = 2.5
+      ctx.beginPath(); ctx.arc(tcx, tcz, TOWN.r * sc, 0, 7); ctx.stroke()
+      ctx.strokeStyle = 'rgba(168,132,94,.4)'
+      ctx.lineWidth = 1
+      ctx.beginPath(); ctx.arc(tcx, tcz, (TOWN.r - 1.2) * sc, 0, 7); ctx.stroke()
+      // ognisko
+      ctx.fillStyle = '#f97316'
+      ctx.beginPath(); ctx.arc(tcx, tcz + 3 * sc, 2.2, 0, 7); ctx.fill()
+      // brama (przerwa w okręgu) — kierunek (-1,-1)
+      ctx.fillStyle = '#141110'
+      ctx.beginPath()
+      ctx.arc(tcx, tcz, TOWN.r * sc + 1.5, 0, 7)
+      ctx.arc(tcx, tcz, (TOWN.r - 2.4) * sc, 0, 7, true)
+      var gA = Math.atan2(1, 1) // brama w stronę (-x,-z) na mapie
+      ctx.save(); ctx.translate(tcx, tcz); ctx.rotate(gA)
+      ctx.fillStyle = '#0a0612'
+      ctx.fillRect(-3.5, TOWN.r * sc - 2.5, 7, 5)
+      ctx.restore()
+      ctx.fillStyle = '#d6c9a8'
+      ctx.font = 'bold 11px Georgia'
+      ctx.textAlign = 'center'
+      ctx.fillText('OSADA', tcx, tcz + TOWN.r * sc + 13)
+    }
     // łupy — tylko na odkrytym terenie
     E.loot.forEach(function (l) {
       if (!visited(l.x, l.z)) return
@@ -623,6 +651,159 @@
       mapTimer = setInterval(drawMap, 150)
     } else if (mapTimer) { clearInterval(mapTimer); mapTimer = null }
   }
+
+  // ============================================================
+  // OSADA (jak obóz z Diablo 2) — palisada, ognisko, namioty, strefa bezpieczna
+  // ============================================================
+  var TOWN = { x: 40, z: 40, r: 14 } // środek obozu = punkt startowy bohatera
+  var fireLight = null, fireFlames = [], townDone = false
+
+  function townBuilt() { return townDone }
+
+  function buildTown() {
+    var dbg = window.__WTdebug
+    var g = window.__WT
+    if (!dbg || !g || !g.scene || townBuilt()) return false
+    var THREE = dbg.THREE
+    if (!THREE) return false
+    var scene = g.scene
+    var root = new THREE.Group()
+    root.name = 'wt-town'
+    root.id = 'wt-town'
+
+    var wood = new THREE.MeshStandardMaterial({ color: 0x6e4a2c, roughness: 1 })
+    var woodDark = new THREE.MeshStandardMaterial({ color: 0x4a3018, roughness: 1 })
+    var canvasM = new THREE.MeshStandardMaterial({ color: 0x7a5c3a, roughness: 1 })
+    var stone = new THREE.MeshStandardMaterial({ color: 0x57534e, roughness: 1 })
+    var flame = new THREE.MeshBasicMaterial({ color: 0xff9a3c, transparent: true, opacity: 0.9 })
+
+    // ---- palisada: pierścień pali z bramą od strony świata (-x,-z) ----
+    var logs = 34
+    var gateAng = Math.atan2(-1, -1) // kierunek u_ (wyjście z obozu)
+    for (var i = 0; i < logs; i++) {
+      var ang = (i / logs) * Math.PI * 2
+      var dAng = Math.atan2(Math.sin(ang - gateAng), Math.cos(ang - gateAng))
+      if (Math.abs(dAng) < 0.28) continue // brama
+      var log = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.3, 2.4 + (i % 3) * 0.25, 6), i % 2 ? wood : woodDark)
+      log.position.set(TOWN.x + Math.cos(ang) * TOWN.r, 1.2, TOWN.z + Math.sin(ang) * TOWN.r)
+      log.rotation.z = (i % 5 - 2) * 0.02
+      root.add(log)
+    }
+    // słupy bramy
+    for (var s = -1; s <= 1; s += 2) {
+      var gAng = gateAng + s * 0.34
+      var post = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.32, 3.1, 6), woodDark)
+      post.position.set(TOWN.x + Math.cos(gAng) * TOWN.r, 1.55, TOWN.z + Math.sin(gAng) * TOWN.r)
+      root.add(post)
+    }
+
+    // ---- ognisko na środku ----
+    var fx = TOWN.x, fz = TOWN.z + 3
+    for (var st = 0; st < 7; st++) {
+      var a2 = (st / 7) * Math.PI * 2
+      var rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.28, 0), stone)
+      rock.position.set(fx + Math.cos(a2) * 0.85, 0.14, fz + Math.sin(a2) * 0.85)
+      root.add(rock)
+    }
+    for (var lw = 0; lw < 3; lw++) {
+      var stick = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 1.5, 5), woodDark)
+      stick.position.set(fx, 0.32, fz)
+      stick.rotation.z = Math.PI / 2.6
+      stick.rotation.y = (lw / 3) * Math.PI * 2
+      root.add(stick)
+    }
+    for (var fl = 0; fl < 3; fl++) {
+      var fmesh = new THREE.Mesh(new THREE.ConeGeometry(0.34 - fl * 0.09, 0.9 + fl * 0.25, 6), flame.clone())
+      fmesh.position.set(fx, 0.55 + fl * 0.22, fz)
+      root.add(fmesh)
+      fireFlames.push(fmesh)
+    }
+    try {
+      fireLight = new THREE.PointLight(0xff8a3c, 14, 16, 2)
+      fireLight.position.set(fx, 1.4, fz)
+      root.add(fireLight)
+    } catch (e) { fireLight = null }
+
+    // ---- namioty ----
+    var tents = [[TOWN.x - 7, TOWN.z - 6, 0.4], [TOWN.x + 7.5, TOWN.z - 5, 2.4], [TOWN.x - 2, TOWN.z + 8.5, -0.6]]
+    tents.forEach(function (tp) {
+      var t = new THREE.Mesh(new THREE.ConeGeometry(2.3, 2.5, 4), canvasM)
+      t.position.set(tp[0], 1.25, tp[1])
+      t.rotation.y = tp[2]
+      root.add(t)
+      var peg = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 1.4, 4), woodDark)
+      peg.position.set(tp[0] + 1.2, 0.7, tp[1] + 1.2)
+      peg.rotation.z = 0.5
+      root.add(peg)
+    })
+
+    // ---- skrzynie i beczki ----
+    var crates = [[TOWN.x + 5, TOWN.z + 5.5, 0.7], [TOWN.x + 5.8, TOWN.z + 6.7, 0.55], [TOWN.x - 5.5, TOWN.z + 3, 0.6]]
+    crates.forEach(function (cp) {
+      var c = new THREE.Mesh(new THREE.BoxGeometry(cp[2], cp[2], cp[2]), wood)
+      c.position.set(cp[0], cp[2] / 2, cp[1])
+      c.rotation.y = cp[0]
+      root.add(c)
+    })
+    var barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 1, 8), woodDark)
+    barrel.position.set(TOWN.x - 4.5, 0.5, TOWN.z + 6)
+    root.add(barrel)
+
+    // ---- sztandar przy bramie ----
+    var bPole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 4.4, 5), woodDark)
+    bPole.position.set(TOWN.x + Math.cos(gateAng + 0.5) * (TOWN.r - 0.4), 2.2, TOWN.z + Math.sin(gateAng + 0.5) * (TOWN.r - 0.4))
+    root.add(bPole)
+    var flag = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 0.7), new THREE.MeshBasicMaterial({ color: 0x7c2d12, side: 2 }))
+    flag.position.copy(bPole.position)
+    flag.position.y = 3.7
+    flag.position.x += 0.6
+    root.add(flag)
+
+    scene.add(root)
+    townDone = true
+
+    // ognisko: migotanie (lekki interval — nie blokuje pauzy)
+    setInterval(function () {
+      if (fireLight) fireLight.intensity = 12 + Math.random() * 6
+      for (var i = 0; i < fireFlames.length; i++) {
+        fireFlames[i].scale.y = 0.85 + Math.random() * 0.3
+        fireFlames[i].rotation.y += 0.2
+      }
+    }, 160)
+
+    // strefa bezpieczna: wrogowie nie wchodzą do obozu — spawny odsuwane od palisady
+    var origSpawn = g.spawnEnemy.bind(g)
+    g.spawnEnemy = function (kind, pos, tier, opts) {
+      var p = pos
+      try {
+        var dx = p.x - TOWN.x, dz = p.z - TOWN.z
+        var d = Math.sqrt(dx * dx + dz * dz)
+        if (d < TOWN.r + 12) {
+          var k = (TOWN.r + 12) / (d || 0.001)
+          p = new THREE.Vector3(TOWN.x + dx * k, 0, TOWN.z + dz * k)
+        }
+      } catch (e) {}
+      return origSpawn(kind, p, tier, opts)
+    }
+
+    // nazwa strefy: jesteśmy w osadzie
+    var zl = document.getElementById('zone-label')
+    if (zl) zl.textContent = 'Osada Żarowarta'
+
+    // osada odkryta na mapie od początku
+    try {
+      var f = loadFog()
+      var ix = Math.round(TOWN.x / FOG_STEP), iz = Math.round(TOWN.z / FOG_STEP)
+      for (var tx = -2; tx <= 2; tx++) for (var tz = -2; tz <= 2; tz++) f.add(cellKey(ix + tx, iz + tz))
+      lsSet(FOG_KEY, JSON.stringify(Array.from(f)))
+    } catch (e) {}
+
+    return true
+  }
+  var townTries = 0
+  var townTimer = setInterval(function () {
+    if (buildTown() || ++townTries > 600) clearInterval(townTimer)
+  }, 250)
 
   // ============================================================
   // KLAWISZE: ESC — menu, TAB — mapa

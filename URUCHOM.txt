@@ -18,6 +18,7 @@ Sterowanie:
   C / I - karta postaci (lalka + sakwa) · P - panel admina przedmiotów
   ESC - menu gry: pauza, zapis/wczytanie (3 sloty), nowa gra, dźwięk
   W rozmowie z NPC przycisk "Handel" = sklep (kupno/sprzedaż za złoto)
+  Start: Osada Żarowarta (palisada, ognisko, namioty) — wrogowie nie wchodzą
   Najedź na przedmiot - tooltip z nazwą i statystykami
 
 Zapis gry, sakwa i ekwipunek żyją w localStorage przeglądarki.
