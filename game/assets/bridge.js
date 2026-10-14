@@ -273,7 +273,10 @@
         saveSlot(Number(el.getAttribute('data-n')))
         menuView = 'main'; renderMenu()
       } else if (act === 'load') {
-        if (loadSlot(Number(el.getAttribute('data-n')))) location.reload()
+        if (loadSlot(Number(el.getAttribute('data-n')))) {
+          try { sessionStorage.setItem('wt.skipTitle', '1') } catch (err) {}
+          location.reload()
+        }
       } else if (act === 'mute') {
         lsSet('wt.mute', lsGet('wt.mute', '0') === '1' ? '0' : '1')
         try { if (window.__WT && window.__WT.muted !== undefined) window.__WT.muted = lsGet('wt.mute') === '1' } catch (err) {}
@@ -893,15 +896,156 @@
   }, 250)
 
   // ============================================================
+  // EKRAN TYTUŁOWY (po załadowaniu gry): logo + menu jak z gry
+  // ============================================================
+  var titleEl = null, titleOn = false
+  window.__wtTitleActive = function () { return titleOn }
+
+  function titleCss() {
+    var st = document.createElement('style')
+    st.textContent =
+      '#wt-title{position:fixed;inset:0;z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(ellipse 60% 46% at 50% 34%,rgba(124,58,237,.28),transparent 65%),radial-gradient(ellipse 90% 60% at 50% 120%,rgba(88,28,135,.4),transparent 70%),#050208f5);font-family:Georgia,serif;user-select:none}' +
+      '#wt-title .t-logo{color:#e9d5ff;letter-spacing:.4em;font-size:clamp(42px,9vw,88px);font-weight:bold;text-shadow:0 0 18px #7c3aed,0 0 70px #6b21a8;animation:wt-tglow 2.6s ease-in-out infinite}' +
+      '@keyframes wt-tglow{50%{text-shadow:0 0 26px #a855f7,0 0 100px #7c3aed}}' +
+      '#wt-title .t-sub{color:#a1a1aa;font-size:14px;letter-spacing:.28em;text-transform:uppercase;margin-top:2px}' +
+      '#wt-title .t-tag{color:#71717a;font-size:12px;margin-top:6px;text-align:center;line-height:1.6}' +
+      '#wt-title .t-menu{display:flex;flex-direction:column;gap:10px;margin-top:30px;width:300px}' +
+      '#wt-title .t-btn{width:100%;padding:11px 16px;font-family:Georgia,serif;font-size:14px;letter-spacing:.18em;text-transform:uppercase;color:#d6d3d1;background:rgba(20,12,32,.75);border:1px solid #3f2a55;border-radius:6px;cursor:pointer;transition:all .16s;text-align:center}' +
+      '#wt-title .t-btn:hover{border-color:#a855f7;color:#f3e8ff;background:rgba(46,22,74,.85);box-shadow:0 0 18px rgba(168,85,247,.35);transform:translateY(-1px)}' +
+      '#wt-title .t-btn.danger:hover{border-color:#b91c1c;box-shadow:0 0 18px rgba(185,28,28,.4)}' +
+      '#wt-title .t-btn:disabled{opacity:.4;cursor:default}' +
+      '#wt-title .t-btn:disabled:hover{border-color:#3f2a55;box-shadow:none;transform:none;color:#d6d3d1;background:rgba(20,12,32,.75)}' +
+      '#wt-title .t-slot{padding:10px 14px;background:rgba(20,12,32,.75);border:1px solid #3f2a55;border-radius:6px;cursor:pointer;color:#d6d3d1;transition:all .16s}' +
+      '#wt-title .t-slot:hover{border-color:#a855f7;box-shadow:0 0 14px rgba(168,85,247,.3)}' +
+      '#wt-title .t-slot.empty{color:#52525b}' +
+      '#wt-title .t-slot .s-t{font-size:13px;letter-spacing:.08em}' +
+      '#wt-title .t-slot .s-m{font-size:11px;color:#71717a;margin-top:2px}' +
+      '#wt-title .t-back{margin-top:14px;padding:8px;font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:#71717a;background:none;border:none;cursor:pointer;font-family:Georgia,serif}' +
+      '#wt-title .t-back:hover{color:#e9d5ff}' +
+      '#wt-title .t-hint{color:#52525b;font-size:11px;letter-spacing:.12em;margin-top:26px}'
+    document.head.appendChild(st)
+  }
+
+  function buildTitleEl() {
+    titleCss()
+    titleEl = document.createElement('div')
+    titleEl.id = 'wt-title'
+    titleEl.innerHTML =
+      '<div class="t-logo">WYRWOR</div>' +
+      '<div class="t-sub">Strumienie zła rozdzierają świat</div>' +
+      '<div class="t-tag">Jesteś Tropicielem. Poluj na wyrwy.<br/>Zapieczętuj je wszystkie.</div>' +
+      '<div class="t-menu" id="wt-title-menu"></div>' +
+      '<div class="t-hint">WASD — ruch · mysz — celowanie · LPM — atak · TAB — mapa · ESC — menu</div>'
+    titleEl.addEventListener('click', onTitleClick)
+    return titleEl
+  }
+
+  function renderTitle(view) {
+    var menu = document.getElementById('wt-title-menu')
+    if (!menu) return
+    if (view === 'main') {
+      var hasSave = !!localStorage.getItem('wt.save')
+      menu.innerHTML =
+        (hasSave ? '<button class="t-btn" data-act="kont">▶ Kontynuuj</button>' : '') +
+        '<button class="t-btn" data-act="nowa">Nowa gra</button>' +
+        '<button class="t-btn" data-act="wczytaj">Wczytaj grę</button>' +
+        '<button class="t-btn" data-act="ustawienia">Ustawienia</button>'
+    } else if (view === 'load') {
+      var h = ''
+      for (var n = 1; n <= 3; n++) {
+        var m = slotMeta(n)
+        if (m) {
+          h += '<div class="t-slot" data-act="load" data-n="' + n + '"><div class="s-t">Zapis ' + n + ' — poz. ' + m.lvl + ', rozdz. ' + m.ch + '</div><div class="s-m">' + fmtDate(m.t) + '</div></div>'
+        } else {
+          h += '<div class="t-slot empty"><div class="s-t">Zapis ' + n + ' — pusty</div></div>'
+        }
+      }
+      menu.innerHTML = h + '<button class="t-back" data-act="main">◂ powrót</button>'
+    } else if (view === 'settings') {
+      var mute = lsGet('wt.mute', '0') === '1'
+      menu.innerHTML =
+        '<button class="t-btn" data-act="mute">Dźwięk: ' + (mute ? 'wyłączony 🔇' : 'włączony 🔊') + '</button>' +
+        '<button class="t-btn" data-act="reset">Usuń całą bazę zapisów</button>' +
+        '<button class="t-back" data-act="main">◂ powrót</button>'
+    }
+  }
+
+  function onTitleClick(e) {
+    var el = e.target.closest ? e.target.closest('[data-act]') : null
+    if (!el) return
+    var act = el.getAttribute('data-act')
+    if (act === 'kont') {
+      hideTitle()
+    } else if (act === 'nowa') {
+      if (localStorage.getItem('wt.save') && !window.confirm('Na pewno nowa gra? Obecny postęp bohatera zostanie utracony (zapisy w slotach zostają).')) return
+      var wipe = ['wt.save', 'wt.class', 'wt.gear', 'wt.inv', 'wt.stats', 'wt.starter', 'wt.gold', 'wt.fog'];
+      for (var i = 0; i < wipe.length; i++) { try { localStorage.removeItem(wipe[i]) } catch (err) {} }
+      try { sessionStorage.setItem('wt.skipTitle', '1') } catch (err) {}
+      location.reload()
+    } else if (act === 'wczytaj') {
+      renderTitle('load')
+    } else if (act === 'load') {
+      var n = Number(el.getAttribute('data-n'))
+      if (slotMeta(n) && loadSlot(n)) {
+        try { sessionStorage.setItem('wt.skipTitle', '1') } catch (err) {}
+        location.reload()
+      }
+    } else if (act === 'ustawienia') {
+      renderTitle('settings')
+    } else if (act === 'mute') {
+      lsSet('wt.mute', lsGet('wt.mute', '0') === '1' ? '0' : '1')
+      try { if (window.__WT && window.__WT.muted !== undefined) window.__WT.muted = lsGet('wt.mute') === '1' } catch (err) {}
+      renderTitle('settings')
+    } else if (act === 'reset') {
+      if (!window.confirm('Usunąć WSZYSTKO? Postęp, zapisy w slotach i odkryta mapa przepadną na zawsze.')) return
+      var kill = SNAP_KEYS.concat(['wt.slot1', 'wt.slot2', 'wt.slot3']);
+      for (var k = 0; k < kill.length; k++) { try { localStorage.removeItem(kill[k]) } catch (err) {} }
+      renderTitle('settings')
+    } else if (act === 'main') {
+      renderTitle('main')
+    }
+  }
+
+  function showTitle() {
+    if (titleOn) return
+    buildTitleEl()
+    document.body.appendChild(titleEl)
+    titleOn = true
+    setPaused(true) // świat czeka za menu
+    renderTitle('main')
+  }
+  function hideTitle() {
+    if (!titleOn) return
+    titleOn = false
+    if (titleEl) { titleEl.remove(); titleEl = null }
+    setPaused(false)
+  }
+
+  // pokaż ekran tytułowy, gdy skończy się ładowanie (intro-overlay znika)
+  var introEl = document.getElementById('intro-overlay')
+  if (introEl) {
+    new MutationObserver(function () {
+      if (introEl.classList.contains('show') || titleOn) return
+      var skip = false
+      try {
+        if (sessionStorage.getItem('wt.skipTitle')) { sessionStorage.removeItem('wt.skipTitle'); skip = true }
+      } catch (err) {}
+      if (!skip) showTitle()
+    }).observe(introEl, { attributes: true, attributeFilter: ['class'] })
+  }
+
+  // ============================================================
   // KLAWISZE: ESC — menu, TAB — mapa
   // ============================================================
   window.addEventListener('keydown', function (e) {
     if (e.key === 'Tab') {
       e.preventDefault()
-      if (!e.repeat) toggleMap()
+      if (titleOn || e.repeat) return
+      toggleMap()
       return
     }
     if (e.key !== 'Escape' || e.repeat) return
+    if (titleOn) { e.preventDefault(); return } // ekran tytułowy ma własne menu
     if (quickPanelOpen()) return
     if (window.__wtCS && window.__wtCS.isOpen && window.__wtCS.isOpen()) return // karta postaci sama się zamknie
     if (shop && shop.classList.contains('show')) { e.preventDefault(); shop.classList.remove('show'); return }

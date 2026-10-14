@@ -305,6 +305,7 @@
 
   window.addEventListener('keydown', (e) => {
     if (e.repeat) return
+    if (window.__wtTitleActive && window.__wtTitleActive()) return
     if (e.code === 'KeyC' || e.code === 'KeyI') { if (loot()) { e.preventDefault(); toggle() } }
     else if (e.code === 'Escape' && open) toggle(false)
   })
