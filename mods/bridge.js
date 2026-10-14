@@ -59,14 +59,15 @@
     var L = g.loot
     var orig = L.maybeDrop.bind(L)
     L.maybeDrop = function (pos, lvl, kind) {
-      orig(pos, lvl, kind)
+      // oryginalne dropy też w try/catch — jeden zły przedmiot nie może zabić pętli gry
+      try { orig(pos, lvl, kind) } catch (e) { console.warn('[wt] błąd dropu (pominięto):', e) }
       try {
         var chance = (GD && typeof GD.dropChance === 'number') ? GD.dropChance / 100 : 0
         var pool = (GD && Array.isArray(GD.items)) ? GD.items.filter(validGameItem) : []
         if (chance > 0 && pool.length && Math.random() < chance) {
           L.drop(pos, JSON.parse(JSON.stringify(pool[Math.floor(Math.random() * pool.length)])))
         }
-      } catch (e) {}
+      } catch (e) { console.warn('[wt] błąd dropu z bazy (pominięto):', e) }
     }
     L.__fileHooked = true
     return true
@@ -856,6 +857,74 @@
     townDone = true
     console.log('[wt] Osada Żarowarta rozbudowana ✓ (plac, 6 domów, 8 pochodni, wieża, wóz)')
 
+    // ---- OPT: scal statyczne meshe osady według materiału (~95 → ~20 draw calls) ----
+    // pochodnie-płomienie zostają osobno (migoczą), światła punktowe zostają.
+    // ustawienie wt.merge: '0' wyłącza scalanie
+    try {
+      if (lsGet('wt.merge', '1') !== '0') {
+        root.updateMatrixWorld(true)
+        var byMat = {}, flames = []
+        root.traverse(function (m) {
+          if (!m.isMesh) return
+          if (m.material === flameM) { flames.push(m); return }
+          var g2 = m.geometry.clone()
+          g2.applyMatrix4(m.matrixWorld) // bake transformy (poprawia też normalne)
+          var key = m.material.uuid
+          ;(byMat[key] = byMat[key] || { mat: m.material, geos: [] }).geos.push(g2)
+        })
+        // przenieś płomienie do roota w współrzędnych świata (przestają być dziećmi grup)
+        var v3a = new THREE.Vector3(), q4 = new THREE.Quaternion(), v3s = new THREE.Vector3()
+        flames.forEach(function (f) {
+          f.matrixWorld.decompose(v3a, q4, v3s)
+          if (f.parent) f.parent.remove(f)
+          f.position.copy(v3a); f.quaternion.copy(q4); f.scale.copy(v3s)
+          root.add(f)
+        })
+        // wyczyść statyczne mesze
+        var rm = []
+        root.traverse(function (m) { if (m.isMesh && m.material !== flameM) rm.push(m) })
+        rm.forEach(function (m) { if (m.parent) m.parent.remove(m) })
+        // scal geometrie (pos/normal/uv + indeks) dla każdego materiału
+        function mergeGeos(list) {
+          var names = ['position', 'normal', 'uv'].filter(function (n) { return list.every(function (g) { return g.getAttribute(n) }) })
+          var out = new THREE.BufferGeometry()
+          names.forEach(function (n) {
+            var itemSize = list[0].getAttribute(n).itemSize
+            var total = 0
+            list.forEach(function (g) { total += g.getAttribute(n).count })
+            var arr = new Float32Array(total * itemSize), off = 0
+            list.forEach(function (g) {
+              arr.set(g.getAttribute(n).array, off)
+              off += g.getAttribute(n).count * itemSize
+            })
+            out.setAttribute(n, new THREE.BufferAttribute(arr, itemSize))
+          })
+          if (list.every(function (g) { return g.index })) {
+            var itotal = 0
+            list.forEach(function (g) { itotal += g.index.count })
+            var idx = new (itotal > 65535 ? Uint32Array : Uint16Array)(itotal), ioff = 0, voff = 0
+            list.forEach(function (g) {
+              var src = g.index.array
+              for (var q = 0; q < src.length; q++) idx[ioff + q] = src[q] + voff
+              ioff += src.length; voff += g.getAttribute('position').count
+            })
+            out.setIndex(new THREE.BufferAttribute(idx, 1))
+          }
+          list.forEach(function (g) { g.dispose() })
+          return out
+        }
+        var mergedCount = 0
+        Object.keys(byMat).forEach(function (key) {
+          var grp = byMat[key]
+          var mesh = new THREE.Mesh(mergeGeos(grp.geos), grp.mat)
+          mesh.frustumCulled = false // cały obóz i tak zawsze w kadrze przy zwiedzaniu
+          root.add(mesh)
+          mergedCount++
+        })
+        console.log('[wt] osada scalona:', mergedCount, 'meshy (draw calls znacznie mniej; wt.merge=0 wraca do wersji drobnych meshy)')
+      }
+    } catch (e) { console.warn('[wt] scalanie osady pominięte (działa bez zmian):', e) }
+
     // migotanie ognia i pochodni
     setInterval(function () {
       for (var i = 0; i < fireLights.length; i++) fireLights[i].light.intensity = fireLights[i].base * (0.85 + Math.random() * 0.3)
@@ -982,6 +1051,7 @@
   function fxEnabled() { return lsGet('wt.fx', '0') !== '0' }
 
   var wtFrames = 0 // licznik klatek do panelu debug
+  var startAt = Date.now()
 
   function tryHookRender() {
     var dbg = window.__WTdebug, g = window.__WT
@@ -1025,9 +1095,79 @@
       console.warn('[wt] post-fx niedostępny (działa bez efektów):', e)
     }
 
+    // ---- stabilność pętli + wydajność ----
+    // 1) cap pixel ratio (bundle ustawia max 2 → na HiDPI to 4× pikseli; 1.5 = ~44% mniej)
+    //    ustawienie wt.pr: liczba (np. 1, 1.5, 2) albo '0' = bez limitu
+    try {
+      var prCap = parseFloat(lsGet('wt.pr', '1.5'))
+      if (prCap > 0 && renderer.getPixelRatio() > prCap) {
+        renderer.setPixelRatio(prCap)
+        renderer.setSize(window.innerWidth, window.innerHeight, false)
+        console.log('[wt] pixel ratio ograniczone do', prCap, '(wt.pr, 0 = bez limitu)')
+      }
+    } catch (e) {}
+
+    // 2) warm-up shaderów dropów: te same warianty materiałów co loot,
+    //    skompilowane Z GÓRY na prawdziwej scenie (z prawdziwymi światłami) —
+    //    pierwszy drop w walce nie powoduje już przycięcia (kompilacja programu GPU)
+    function warmLootShaders() {
+      try {
+        var sc = g.scene, cam = g.camera
+        if (!sc || !cam) return
+        var warm = new T.Group()
+        var m1 = new T.MeshStandardMaterial({ color: 0x555555, emissive: 0x555555, emissiveIntensity: 0.6, roughness: 0.4, metalness: 0.3, transparent: true, opacity: 1 })
+        var m2 = new T.MeshBasicMaterial({ color: 0x555555, transparent: true, opacity: 0.5, blending: 2, depthWrite: false, side: 2 })
+        var geo = new T.BoxGeometry(0.01, 0.01, 0.01)
+        var a = new T.Mesh(geo, m1), b = new T.Mesh(geo, m2)
+        // drobne jak ziarnko piasku przy ognisku; frustumCulled=false → na pewno trafią do renderu i skompilują program GPU
+        a.position.set(TOWN.x, 0.5, TOWN.z); b.position.set(TOWN.x, 0.52, TOWN.z)
+        a.frustumCulled = false; b.frustumCulled = false
+        warm.add(a); warm.add(b)
+        sc.add(warm)
+        origRender(sc, cam)
+        sc.remove(warm)
+        m1.dispose(); m2.dispose(); geo.dispose()
+        console.log('[wt] shadery dropów rozgrzane (bez przycięcia przy pierwszym dropie)')
+      } catch (e) { console.warn('[wt] warm-up shaderów pominięty:', e) }
+    }
+    setTimeout(warmLootShaders, 6000) // po starcie gry, gdy scena i światła są gotowe
+
+    // 3) guard pętli: wyjątek w renderze nie może zabić pętli animacji (czarny ekran / zawieszenie)
+    var lastFrameAt = Date.now(), loopErrors = {}
+    function guardedRender(scene2, cam2) {
+      try {
+        origRender(scene2, cam2)
+        lastFrameAt = Date.now()
+      } catch (e) {
+        var msg = String(e && e.message || e)
+        if (!loopErrors[msg]) { loopErrors[msg] = 1; console.error('[wt] wyjątek w renderze (pętla dalej działa):', e) }
+      }
+    }
+
+    // 4) watchdog: brak klatek przez >6 s przy widocznej karcie = zawieszona pętla → komunikat
+    setInterval(function () {
+      try {
+        if (document.hidden) return
+        var menu = document.getElementById('wt-menu')
+        var paused = menu && menu.style && menu.style.display !== '' && menu.style.display !== 'none'
+        if (paused) return
+        if (Date.now() - lastFrameAt > 6000 && Date.now() - startAt > 15000) {
+          var d = document.getElementById('wt-hang')
+          if (!d) {
+            d = document.createElement('div')
+            d.id = 'wt-hang'
+            d.setAttribute('style', 'position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:9999;background:rgba(80,10,10,.92);color:#fff;padding:10px 16px;border-radius:8px;font:13px Georgia,serif')
+            d.textContent = 'Pętla renderu przestała działać — F5 odświeża (stan zapisany w menu ESC jest bezpieczny)'
+            document.body.appendChild(d)
+            console.error('[wt] brak klatek od', Math.round((Date.now() - lastFrameAt) / 1000), 's — sprawdź błędy wyżej (F12)')
+          }
+        }
+      } catch (e) {}
+    }, 2000)
+
     renderer.render = function (scene, camera) {
       wtFrames++
-      if (!fxOk || !fxEnabled()) { origRender(scene, camera); return }
+      if (!fxOk || !fxEnabled()) { guardedRender(scene, camera); return }
       try {
         var S = fxState
         if (g.hero && g.hero.hp !== undefined) {
@@ -1037,7 +1177,7 @@
         }
         flash *= 0.94
         S.finalMat.uniforms.flash.value = flash
-        renderer.setRenderTarget(S.sceneRT); origRender(scene, camera)
+        renderer.setRenderTarget(S.sceneRT); guardedRender(scene, camera)
         S.quad.material = S.brightMat
         S.brightMat.uniforms.tDiffuse.value = S.sceneRT.texture
         renderer.setRenderTarget(S.rtA); origRender(S.quadScene, S.quadCam)
