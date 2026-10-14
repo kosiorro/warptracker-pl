@@ -977,7 +977,9 @@
   var FX_VS = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }'
   var FX_BRIGHT = 'varying vec2 vUv; uniform sampler2D tDiffuse; uniform float threshold; void main(){ vec3 c = texture2D(tDiffuse, vUv).rgb; float l = dot(c, vec3(0.299,0.587,0.114)); float f = smoothstep(threshold, threshold + 0.35, l); gl_FragColor = vec4(c * f, 1.0); }'
   var FX_BLUR = 'varying vec2 vUv; uniform sampler2D tDiffuse; uniform vec2 dir; uniform vec2 texel; void main(){ vec3 s = texture2D(tDiffuse, vUv).rgb * 0.227; for (int i = 1; i < 5; i++) { vec2 o = dir * texel * float(i); float w = (i==1) ? 0.194 : (i==2) ? 0.121 : (i==3) ? 0.054 : 0.016; s += texture2D(tDiffuse, vUv + o).rgb * w; s += texture2D(tDiffuse, vUv - o).rgb * w; } gl_FragColor = vec4(s, 1.0); }'
-  var FX_FINAL = 'varying vec2 vUv; uniform sampler2D tScene; uniform sampler2D tBloom; uniform float flash; void main(){ vec3 c = texture2D(tScene, vUv).rgb + texture2D(tBloom, vUv).rgb * 0.85; vec2 d = vUv - 0.5; float vig = 1.0 - dot(d, d) * 0.9; c *= clamp(vig, 0.0, 1.0); c = mix(c, vec3(0.55, 0.02, 0.02), flash * 0.3); gl_FragColor = vec4(c, 1.0); }'
+  var FX_FINAL = 'varying vec2 vUv; uniform sampler2D tScene; uniform sampler2D tBloom; uniform float flash; void main(){ vec3 c = texture2D(tScene, vUv).rgb + texture2D(tBloom, vUv).rgb * 0.85; vec2 d = vUv - 0.5; float vig = 1.0 - dot(d, d) * 0.9; c *= clamp(vig, 0.0, 1.0); c = mix(c, vec3(0.55, 0.02, 0.02), flash * 0.3); c = pow(max(c, vec3(0.0)), vec3(1.0/2.2)); gl_FragColor = vec4(c, 1.0); }' // pow(1/2.2): render-target trzyma wartości LINIOWE, canvas oczekuje sRGB
+
+  function fxEnabled() { return lsGet('wt.fx', '0') !== '0' }
 
   var wtFrames = 0 // licznik klatek do panelu debug
 
@@ -991,7 +993,7 @@
     var fxOk = false, fxState = null
 
     try {
-      var sz = renderer.getSize(new T.Vector2())
+      var sz = renderer.getDrawingBufferSize(new T.Vector2())
       var w = Math.max(2, sz.x), h = Math.max(2, sz.y)
       var rtOpts = { minFilter: T.LinearFilter, magFilter: T.LinearFilter }
       var sceneRT = new T.WebGLRenderTarget(w, h, rtOpts)
@@ -1001,6 +1003,7 @@
       var quadCam = new T.OrthographicCamera(-1, 1, 1, -1, 0, 1)
       var quadScene = new T.Scene()
       var quad = new T.Mesh(new T.PlaneGeometry(2, 2))
+      quad.frustumCulled = false
       quadScene.add(quad)
       var brightMat = new T.ShaderMaterial({ uniforms: { tDiffuse: { value: null }, threshold: { value: 0.72 } }, vertexShader: FX_VS, fragmentShader: FX_BRIGHT, depthTest: false, depthWrite: false })
       var blurMat = new T.ShaderMaterial({ uniforms: { tDiffuse: { value: null }, dir: { value: new T.Vector2(1, 0) }, texel: { value: new T.Vector2(1 / bw, 1 / bh) } }, vertexShader: FX_VS, fragmentShader: FX_BLUR, depthTest: false, depthWrite: false })
@@ -1009,7 +1012,7 @@
       fxState = { sceneRT: sceneRT, rtA: rtA, rtB: rtB, quad: quad, quadScene: quadScene, quadCam: quadCam, brightMat: brightMat, blurMat: blurMat, finalMat: finalMat }
       window.addEventListener('resize', function () {
         try {
-          var s2 = renderer.getSize(new T.Vector2())
+          var s2 = renderer.getDrawingBufferSize(new T.Vector2())
           sceneRT.setSize(s2.x, s2.y)
           var b2w = Math.max(2, s2.x >> 1), b2h = Math.max(2, s2.y >> 1)
           rtA.setSize(b2w, b2h); rtB.setSize(b2w, b2h)
@@ -1017,14 +1020,14 @@
         } catch (e) {}
       })
       fxOk = true
-      console.log('[wt] post-fx aktywny: bloom + vignette + flash obrażeń')
+      console.log('[wt] post-fx gotowy (F4 włącza/wyłącza, domyślnie: ' + (fxEnabled() ? 'ON' : 'OFF') + ')')
     } catch (e) {
       console.warn('[wt] post-fx niedostępny (działa bez efektów):', e)
     }
 
     renderer.render = function (scene, camera) {
       wtFrames++
-      if (!fxOk) { origRender(scene, camera); return }
+      if (!fxOk || !fxEnabled()) { origRender(scene, camera); return }
       try {
         var S = fxState
         if (g.hero && g.hero.hp !== undefined) {
@@ -1087,6 +1090,10 @@
       e.preventDefault()
       var p = ensureDbgPanel()
       p.style.display = p.style.display === 'none' ? 'block' : 'none'
+    } else if (e.key === 'F4') {
+      e.preventDefault()
+      lsSet('wt.fx', fxEnabled() ? '0' : '1')
+      console.log('[wt] post-fx:', fxEnabled() ? 'ON (bloom + vignette + flash)' : 'OFF (czysty render)')
     }
   })
 

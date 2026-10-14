@@ -93,7 +93,7 @@ Brakujący plik `.glb` jest pomijany z ostrzeżeniem w konsoli (gra nie odmówi 
 
 - **ESC** otwiera menu gry: wróć do gry, karta postaci, zapis gry (3 sloty), wczytanie, dźwięk, nowa gra.
 - **Osada Żarowarta**: start w obozie jak z Diablo 2 — palisada z bramą, ognisko z migoczącym światłem, namioty, skrzynie, sztandar. Wrogowie nie wchodzą do obozu (spawny są odsuwane).
-- **Grafika i dźwięk**: bloom + vignette + flash obrażeń (własny pipeline post-fx, bez zewnętrznych zależności), ambient muzyczny + dźwięki UI (Howler z CDN, sample w `assets/sfx.js`; bez internetu działa wbudowany dron WebAudio). **F3** — panel debug (FPS, draw calls, trójkąty).
+- **Grafika i dźwięk**: bloom + vignette + flash obrażeń (własny pipeline post-fx, **F4 włącza/wyłącza na żywo**, zapamiętane), ambient muzyczny + dźwięki UI (Howler z CDN, sample w `assets/sfx.js`; bez internetu działa wbudowany dron WebAudio). **F3** — panel debug (FPS, draw calls, trójkąty).
 - Nowe dźwięki regenerujesz przez `python3 game/tools/gen-sfx.py`.
 - **Zapis / wczytanie**: migawka całego stanu (bohater, ekwipunek, sakwa, statystyki, złoto) ląduje w `localStorage` w 3 slotach.
 - **Sklep**: w rozmowie z NPC w mieście pojawia się przycisk **🛒 Handel** — kupuj przedmioty z bazy gry (gamedata.json) za złoto, sprzedawaj zawartość sakwy. Start: 🪙 50.
