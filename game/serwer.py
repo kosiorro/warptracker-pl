@@ -19,6 +19,11 @@ class DevHandler(SimpleHTTPRequestHandler):
     def log_message(self, fmt, *args):
         sys.stderr.write("[wt] %s\n" % (fmt % args))
 
+    # wyłącz cache przeglądarki — zawsze świeże pliki po F5 (bez Ctrl+Shift+R)
+    def end_headers(self):
+        self.send_header('Cache-Control', 'no-store, max-age=0')
+        super().end_headers()
+
     # --- API ---
     def _json(self, code, obj):
         body = json.dumps(obj).encode('utf-8')

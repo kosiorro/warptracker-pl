@@ -308,10 +308,10 @@
   function gold() { var g = parseInt(lsGet('wt.gold', ''), 10); return isNaN(g) ? 50 : g }
   function setGold(v) { lsSet('wt.gold', String(v)) }
   function priceOf(it) {
-    var base = { common: 20, magic: 60, rare: 140, unique: 320 }[it.rarity] || 20
-    var sum = 0
-    (it.affixes || []).forEach(function (a) { sum += a.value })
-    return base + sum * 2
+    var base = { common: 20, magic: 60, rare: 140, unique: 320 }[it.rarity] || 20;
+    var sum = 0;
+    (it.affixes || []).forEach(function (a) { sum += a.value });
+    return base + sum * 2;
   }
 
   function shopItems() {
@@ -489,60 +489,72 @@
     var ctx = mapCv.getContext('2d')
     var W = mapCv.width, H = mapCv.height
     var E = mapEntities()
-    // zakres: dopasuj do istot, min. promień 35 wokół gracza
     var cx = E.me ? E.me.x : 0, cz = E.me ? E.me.z : 0
-    var r = 35
-    var all = [{ x: cx, z: cz }].concat(E.npcs, E.foes, E.loot)
-    all.forEach(function (p) {
-      r = Math.max(r, Math.abs(p.x - cx), Math.abs(p.z - cz))
-    })
-    r = Math.min(r + 8, 400)
-    var sc = (Math.min(W, H) / 2 - 24) / r
+    // stała skala (jak minimapa): promień 70 kroków, stabilny obraz
+    var r = 70
+    var sc = (Math.min(W, H) / 2 - 20) / r
     function px(x) { return W / 2 + (x - cx) * sc }
     function pz(z) { return H / 2 - (z - cz) * sc } // oś Z odwrócona: północ = -Z
+    // punkt doczepiony do krawędzi, gdy poza zasięgiem mapy
+    function clampPt(p) {
+      var dx = (p.x - cx) * sc, dz = -(p.z - cz) * sc
+      var d = Math.sqrt(dx * dx + dz * dz), lim = Math.min(W, H) / 2 - 14
+      if (d <= lim) return { x: W / 2 + dx, y: H / 2 + dz, edge: false }
+      var k = lim / d
+      return { x: W / 2 + dx * k, y: H / 2 + dz * k, edge: true }
+    }
 
     ctx.clearRect(0, 0, W, H)
-    // tło: mgła + siatka
     var grad = ctx.createRadialGradient(W / 2, H / 2, 20, W / 2, H / 2, W / 2)
     grad.addColorStop(0, '#171029')
     grad.addColorStop(1, '#0a0612')
     ctx.fillStyle = grad
     ctx.fillRect(0, 0, W, H)
+    ctx.save()
+    ctx.beginPath(); ctx.arc(W / 2, H / 2, Math.min(W, H) / 2 - 12, 0, 7); ctx.clip()
     ctx.strokeStyle = 'rgba(168,85,247,.12)'
     ctx.lineWidth = 1
-    for (var gx = -r; gx <= r; gx += 20) {
-      ctx.beginPath(); ctx.moveTo(px(cx + gx), 0); ctx.lineTo(px(cx + gx), H); ctx.stroke()
-      ctx.beginPath(); ctx.moveTo(0, pz(cz + gx)); ctx.lineTo(W, pz(cz + gx)); ctx.stroke()
+    for (var g10 = -r; g10 <= r; g10 += 10) {
+      ctx.beginPath(); ctx.moveTo(px(cx + g10), 0); ctx.lineTo(px(cx + g10), H); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(0, pz(cz + g10)); ctx.lineTo(W, pz(cz + g10)); ctx.stroke()
     }
     // łupy
     E.loot.forEach(function (l) {
+      var pt = clampPt(l)
+      ctx.globalAlpha = pt.edge ? .45 : 1
       ctx.fillStyle = RAR[l.rarity] || '#d6d3d1'
       ctx.beginPath()
-      ctx.moveTo(px(l.x), pz(l.z) - 5); ctx.lineTo(px(l.x) + 5, pz(l.z)); ctx.lineTo(px(l.x), pz(l.z) + 5); ctx.lineTo(px(l.x) - 5, pz(l.z))
+      ctx.moveTo(pt.x, pt.y - 5); ctx.lineTo(pt.x + 5, pt.y); ctx.lineTo(pt.x, pt.y + 5); ctx.lineTo(pt.x - 5, pt.y)
       ctx.closePath(); ctx.fill()
     })
     // wrogowie
     E.foes.forEach(function (f) {
+      var pt = clampPt(f)
+      ctx.globalAlpha = pt.edge ? .45 : 1
       ctx.fillStyle = f.elite ? '#dc2626' : '#ef4444'
-      ctx.beginPath(); ctx.arc(px(f.x), pz(f.z), f.elite ? 4.5 : 3, 0, 7); ctx.fill()
+      ctx.beginPath(); ctx.arc(pt.x, pt.y, f.elite ? 4.5 : 3, 0, 7); ctx.fill()
     })
     // NPC
-    ctx.fillStyle = '#fbbf24'
     E.npcs.forEach(function (n) {
-      ctx.beginPath(); ctx.arc(px(n.x), pz(n.z), 4, 0, 7); ctx.fill()
-      if (n.id) {
+      var pt = clampPt(n)
+      ctx.globalAlpha = pt.edge ? .45 : 1
+      ctx.fillStyle = '#fbbf24'
+      ctx.beginPath(); ctx.arc(pt.x, pt.y, 4, 0, 7); ctx.fill()
+      if (n.id && !pt.edge) {
         ctx.fillStyle = '#a16207'
         ctx.font = '10px Georgia'
         ctx.textAlign = 'center'
-        ctx.fillText(n.id, px(n.x), pz(n.z) - 7)
+        ctx.fillText(n.id, pt.x, pt.y - 7)
       }
     })
-    // gracz
+    ctx.restore()
+    ctx.globalAlpha = 1
+    // gracz — strzałka zwrócona w kierunku patrzenia (forward = (sin yaw, 0, cos yaw))
     if (E.me) {
       var mx = px(E.me.x), mz = pz(E.me.z)
       ctx.save()
       ctx.translate(mx, mz)
-      if (E.me.yaw !== null && !isNaN(E.me.yaw)) ctx.rotate(-E.me.yaw)
+      ctx.rotate(E.me.yaw || 0)
       ctx.fillStyle = '#c084fc'
       ctx.shadowColor = '#a855f7'; ctx.shadowBlur = 14
       ctx.beginPath()
@@ -554,9 +566,8 @@
     ctx.fillStyle = '#52525b'
     ctx.font = '10px Georgia'
     ctx.textAlign = 'left'
-    var bar = 20 * sc
-    ctx.fillRect(16, H - 22, bar, 3)
-    ctx.fillText('20 kroków', 16, H - 27)
+    ctx.fillRect(16, H - 22, 10 * sc, 3)
+    ctx.fillText('10 kroków', 16, H - 27)
   }
 
   function mapOpen() { return !!(mapEl && mapEl.classList.contains('show')) }
