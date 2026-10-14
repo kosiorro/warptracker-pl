@@ -1052,6 +1052,17 @@
 
   var wtFrames = 0 // licznik klatek do panelu debug
   var startAt = Date.now()
+  var wtStartP = performance.now()
+
+  // ============================================================
+  // PROFILER PRZYCIĘĆ: klatki >90 ms + korelacja ze zdarzeniami (drop/banner)
+  // i detektor GC (spadek sterty JS w trakcie przycięcia = pauza garbage collectora)
+  // ============================================================
+  var wtEvents = [], wtHitches = [], wtHitchCount = 0, wtLastHeap = 0
+  function wtNote(ev) {
+    wtEvents.push(ev + ' @' + Math.round(performance.now()) + 'ms')
+    if (wtEvents.length > 10) wtEvents.shift()
+  }
 
   function tryHookRender() {
     var dbg = window.__WTdebug, g = window.__WT
@@ -1132,6 +1143,29 @@
     }
     setTimeout(warmLootShaders, 6000) // po starcie gry, gdy scena i światła są gotowe
 
+    // 5b) pre-warm DOM: pierwszy paint każdego wariantu CSS (banner zwykły/boss,
+    //     wszystkie kolory liczb obrażeń/nazw itemów) wykonujemy na starcie,
+    //     żeby w walce nie było jednorazowego kosztu rasteryzacji fontu/cienia
+    function warmDom() {
+      try {
+        var hud = g.hud
+        var hudRoot = (hud && hud.hudRoot) || document.getElementById('hud')
+        if (!hudRoot) return
+        ;['dmg', 'dmg xp', 'dmg hero', 'dmg warded', 'dmg loot', 'dmg loot-common', 'dmg loot-magic', 'dmg loot-rare', 'dmg loot-unique', 'dmg loot-shatter'].forEach(function (cls) {
+          var d = document.createElement('div')
+          d.className = cls
+          d.textContent = '77'
+          d.style.left = '-999px'; d.style.top = '-999px'
+          hudRoot.appendChild(d)
+          window.setTimeout(function () { d.remove() }, 1000)
+        })
+        if (hud && hud.showBanner) { hud.showBanner(' ', 50, ''); hud.showBanner(' ', 50, 'boss') }
+        if (hud && hud.setBoss) { hud.setBoss(' ', 0, 1); hud.setBoss(null) }
+        console.log('[wt] DOM rozgrzany (warianty tekstów i bannerów)')
+      } catch (e) {}
+    }
+    setTimeout(warmDom, 6500)
+
     // 3) guard pętli: wyjątek w renderze nie może zabić pętli animacji (czarny ekran / zawieszenie)
     var lastFrameAt = Date.now(), loopErrors = {}
     function guardedRender(scene2, cam2) {
@@ -1165,8 +1199,37 @@
       } catch (e) {}
     }, 2000)
 
+    // 5) PROFILER PRZYCIĘĆ: znaczniki zdarzeń, żeby wiedzieć CO zbiegło się z zacięciem
+    try {
+      var hud = g.hud, L = g.loot
+      if (hud && hud.showBanner && !hud.__wtNoted) {
+        var ob1 = hud.showBanner.bind(hud)
+        hud.showBanner = function (t, d, cls) { wtNote('banner' + (cls ? ':' + cls : '') + ' "' + String(t).slice(0, 24) + '"'); return ob1(t, d, cls) }
+        hud.__wtNoted = true
+      }
+      if (L && L.drop && !L.__wtNoted) {
+        var od = L.drop.bind(L)
+        L.drop = function (pos, item) { try { wtNote('drop ' + (item && item.rarity ? item.rarity : '?') + '/' + (item && item.slot ? item.slot : '?')) } catch (e) {} return od(pos, item) }
+        var ou = L.update.bind(L)
+        L.update = function (dt, pos) { var n = (L.drops || []).length; var r = ou(dt, pos); if (L.drops && L.drops.length !== n) wtNote('drop zebrany/usunięty (' + n + '→' + L.drops.length + ')'); return r }
+        L.__wtNoted = true
+      }
+    } catch (e) {}
+
+    var wtLastFrameT = performance.now()
     renderer.render = function (scene, camera) {
       wtFrames++
+      var __now = performance.now(), __dt = __now - wtLastFrameT
+      wtLastFrameT = __now
+      if (!document.hidden && __dt > 90 && __now - wtStartP > 12000) {
+        wtHitchCount++
+        var __gc = '', __h = 0
+        try { if (performance.memory) { __h = performance.memory.usedJSHeapSize; if (wtLastHeap && __h < wtLastHeap - 786432) __gc = ' [GC? sterta spadła ' + Math.round((wtLastHeap - __h) / 1048576) + ' MB]' } } catch (e) {}
+        var rec = Math.round(__dt) + ' ms' + __gc + ' ← ' + wtEvents.slice(-3).join(' | ')
+        wtHitches.push(rec); if (wtHitches.length > 8) wtHitches.shift()
+        console.info('[wt] PRZYCIĘCIE ' + rec)
+      }
+      try { if (performance.memory) wtLastHeap = performance.memory.usedJSHeapSize } catch (e) {}
       if (!fxOk || !fxEnabled()) { guardedRender(scene, camera); return }
       try {
         var S = fxState
@@ -1223,7 +1286,9 @@
       'FPS: ' + fps + (fps && fps < 30 ? '  ⚠' : '') + '\n' +
       'draw calls: ' + (info ? info.calls : '?') + '\n' +
       'trójkąty: ' + (info ? info.triangles : '?') + '\n' +
-      'geometrie: ' + ((g && g.renderer && g.renderer.info.memory) ? g.renderer.info.memory.geometries : '?')
+      'geometrie: ' + ((g && g.renderer && g.renderer.info.memory) ? g.renderer.info.memory.geometries : '?') + '\n' +
+      'przycięcia (>90ms): ' + wtHitchCount + (wtHitches.length ? '\n  ostatnie:\n  ' + wtHitches.slice(-3).join('\n  ') : '') + '\n' +
+      'zdarzenia: ' + (wtEvents.length ? wtEvents.slice(-3).join(' | ') : 'brak')
   }, 500)
   window.addEventListener('keydown', function (e) {
     if (e.key === 'F3') {
