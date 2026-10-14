@@ -626,7 +626,7 @@ function renderChar() {
 // ==================== ZAKŁADKA: BAZA GRY (plik) ====================
 const EDITABLE_FILES = [
   'data/gamedata.json',
-  'assets/admin.js', 'assets/admin-app.js', 'assets/bridge.js',
+  'assets/admin.js', 'assets/admin-app.js', 'assets/bridge.js', 'assets/charsheet.js',
   'assets/index-FsptR_Zn.js', 'assets/index-BEkZlT_U.css',
   'index.html', 'admin.html', 'serwer.py',
   'assets/parts/p01.js', 'assets/parts/p02.js', 'assets/parts/p03.js', 'assets/parts/p04.js',

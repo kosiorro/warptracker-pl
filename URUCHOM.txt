@@ -15,7 +15,10 @@ Warptracker PL — instrukcja uruchomienia
 Sterowanie:
   WASD - ruch · mysz - celowanie · LPM - atak · SPACE - unik
   1/2/3 - umiejętności · E - rozmowa · kółko - zoom · M - dźwięk
-  C / I - karta postaci · P - panel admina przedmiotów
+  C / I - karta postaci (lalka + sakwa) · P - panel admina przedmiotów
+  ESC - menu gry: pauza, zapis/wczytanie (3 sloty), nowa gra, dźwięk
+  W rozmowie z NPC przycisk "Handel" = sklep (kupno/sprzedaż za złoto)
+  Najedź na przedmiot - tooltip z nazwą i statystykami
 
 Zapis gry, sakwa i ekwipunek żyją w localStorage przeglądarki.
 

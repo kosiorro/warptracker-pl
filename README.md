@@ -87,7 +87,14 @@ Brakujący plik `.glb` jest pomijany z ostrzeżeniem w konsoli (gra nie odmówi 
 
 - **WASD** — ruch, **mysz** — celowanie, **LPM** — combo mieczem
 - **SPACE** — unik (i-frames), **1/2/3** — umiejętności, **E** — rozmowa
-- **C / I** — karta postaci, **P** — panel admina, **ESC** — pauza, **M** — dźwięk, **kółko** — zoom
+- **C / I** — karta postaci (papierowa lalka + sakwa), **P** — panel admina, **ESC** — menu gry (pauza, zapis/wczytanie, nowa gra, dźwięk), **M** — dźwięk, **kółko** — zoom
+
+## Menu gry, sklep i zapisy
+
+- **ESC** otwiera menu gry: wróć do gry, karta postaci, zapis gry (3 sloty), wczytanie, dźwięk, nowa gra.
+- **Zapis / wczytanie**: migawka całego stanu (bohater, ekwipunek, sakwa, statystyki, złoto) ląduje w `localStorage` w 3 slotach.
+- **Sklep**: w rozmowie z NPC w mieście pojawia się przycisk **🛒 Handel** — kupuj przedmioty z bazy gry (gamedata.json) za złoto, sprzedawaj zawartość sakwy. Start: 🪙 50.
+- **Tooltipy**: najedź kursorem na przedmiot (karta postaci, sklep, ekwipunek) — zobaczysz nazwę i statystyki.
 
 ## Licencje i podziękowania
 
