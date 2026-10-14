@@ -27,8 +27,9 @@ cd warptracker-pl/game
 # 1. modele 3D są już w repo (base64 w game/models/b64/) — nic nie trzeba pobierać.
 #    (opcjonalnie: ../pobierz-modely.sh pobiera oryginalne pliki GLB bezpośrednio)
 
-# 2. odpal serwer:
-python3 -m http.server 8080   # lub: python -m http.server 8080 / npx serve .
+# 2. odpal serwer (z API zapisu dla panelu admina):
+python3 serwer.py             # port 8080; własny: python3 serwer.py 3000
+#    (python3 -m http.server też zadziała, ale panel nie będzie mógł zapisywać plików)
 # 3. gra:      http://localhost:8080
 #    panel admina (osobna strona, pełny): http://localhost:8080/admin.html
 ```
@@ -60,12 +61,16 @@ Gra może działać też online przez GitHub Pages. Pages serwuje tylko katalog 
 
 ## Panel admina — osobna strona (`/admin.html`)
 
-Pełna wersja panelu z zakładkami (skrót P w grze zostaje jako szybki edytor przedmiotów):
-- **Przedmioty** — baza, zakładanie, sakwa, import/eksport, podgląd 3D, szansa dropów z bazy (na żywo)
+Panel zmienia **pliki gry** (bazę i kod — trwale, do gita), nie tylko stan partii:
+
+- **🗄 Baza gry / Kod** — edytor pliku `game/data/gamedata.json` (dialogi NPC, pula przedmiotów, dropChance) **i edytor kodu gry** (mody, loader, HTML, części bundla). Zapisy idą prosto na dysk przez API serwera (`serwer.py`); potem `git commit` + F5 w grze
+- **Dialogi / NPC** — przyjazne formularze nad kwestiami Serry, Marka, Vess i Branna — edytują ten sam plik `gamedata.json`
+- **Przedmioty** — zakładanie, sakwa, import/eksport, podgląd 3D (stan sesji)
 - **Modele 3D** — lista własnych .glb
-- **Dialogi / NPC** — edytor z **aktualnymi kwestiami z gry**, nadpisywanie Serry, Marka, Vess i Branna (**na żywo**, bez F5)
-- **Postać** — klasa, poziom, XP, rozdział fabuły, łowy, reset postaci
-- **Kopia / Reset** — eksport i import całego stanu gry
+- **Postać** — klasa, poziom, XP, rozdział fabuły (zapis gry)
+- **Kopia / Reset** — eksport/import całego stanu
+
+**Baza gry = plik.** `game/data/gamedata.json` jest źródłem prawdy dla dialogów i bazowych przedmiotów — gra ładuje go przy starcie (bridge.js), dropy z puli lecą przy zabójstwach. Zmiany widoczne po F5.
 
 Strona i gra dzielą localStorage (ten sam serwer) — najlepiej trzymać je w dwóch kartach obok siebie. Przycisk **Pauza** w nagłówku panelu (i **ESC** w grze) zamraża/wznawia grę z poziomu panelu. Dialogi i dropy działają natychmiast; postać/ekwipunek wymagają F5 w grze. Podgląd 3D na stronie korzysta z CDN three.js (bez internetu reszta panelu działa normalnie).
 

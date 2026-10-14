@@ -510,25 +510,7 @@
   })
   $('wt-adm-model-name').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('wt-adm-model-add').click() })
 
-  // ---------- dropy z bazy w grze ----------
-  function hookDrops() {
-    var g = wt()
-    if (!g || !g.loot || g.loot.__dbHooked) return false
-    var L = g.loot
-    var orig = L.maybeDrop.bind(L)
-    L.maybeDrop = function (pos, lvl, kind) {
-      orig(pos, lvl, kind)
-      var db = loadDB()
-      if (db.dropChance > 0 && db.items.length && Math.random() < db.dropChance) {
-        var it = clone(db.items[Math.floor(Math.random() * db.items.length)])
-        try { L.drop(pos, it) } catch (e) {}
-      }
-    }
-    L.__dbHooked = true
-    return true
-  }
-  var tries = 0
-  var t = setInterval(function () { if (hookDrops() || ++tries > 400) clearInterval(t) }, 500)
+  // dropy z bazy gry (plik gamedata.json) obsługuje bridge.js — tu tylko quick-db sesji
 
   // ---------- otwieranie / zamykanie ----------
   function open() {

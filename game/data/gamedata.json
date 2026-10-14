@@ -1,0 +1,50 @@
+{
+  "_comment": "Baza gry Warptracker PL. Ten plik jest ŹRÓDŁEM PRAWDY dla dialogów NPC i puli bazowych przedmiotów. Edytuj go w panelu admina (admin.html) lub ręcznie. Zmiany wchodzą do gry po F5.",
+  "npcs": {
+    "serra": {
+      "name": "Strażniczka Serra",
+      "lines": [
+        "Kolejny Tropicielu. Dobrze. Poprzedni wrócił w kawałkach.",
+        "Bagna roi się od pomiotów wyrwy. Przerzedź ich szeregi — osiem łbów — a uwierzę, że twój miecz to coś więcej niż gładź.",
+        "Umiesz więc ugryźć. Pomioty wylewają się z iglic — czarnych gwoździ, które wyrwa wbija w ziemię.",
+        "Trzy górują nad bagnami. Ich wardy pękają, gdy zginą ich strażnicy. Rozbij wszystkie trzy.",
+        "Osiem. Policz je, albo bagna policzą ciebie.",
+        "Bagna są ciche. Ale ziemia wciąż dudni, Tropicielu. Porozmawiaj z Markiem — on też to poczuł.",
+        "Warda iglicy ginie razem ze strażnikami. Zabij watahę, a potem rozbij kamień.",
+        "Bagna nigdy nie zostają czyste. Zawsze są nowe łowy.",
+        "Cztery pieczęcie, czysto. Bagna znów się wypełnią — zawsze tak bywa."
+      ]
+    },
+    "marek": {
+      "name": "Stary Marek, Kronikarz",
+      "lines": [
+        "Usiądź na chwilę przy ogniu, Tropicielu. Posłuchaj.",
+        "Wyrwy to nie rany. Rany się zamykają. To drzwi — a drzwi ktoś trzyma otwarte.",
+        "Pod kurhanem coś zakotwicza je wszystkie. Serce nurtu. Rozbij je, a bagna znów zaczną oddychać.",
+        "Czujesz, że umarło? To był jeden węzeł na jednej nitce. Nurt płynie skądś, gdzie jest o wiele ciemniej. Odpocznij. Potem pójdziemy za nim.",
+        "Kurhan leży na dalekim skraju bagien, za szubienicznym drzewem. Zejdź starą drogą."
+      ]
+    },
+    "vess": {
+      "name": "Vess, Szyjąca",
+      "lines": [
+        "Krwawisz? Siadaj. Mam nitkę i ogień, a żadne z nich nie obchodzi, ile wrzeszczysz.",
+        "Wyrwa zostawia ślady pod skórą. Twoje są… płytkie. Tak to zostaw.",
+        "Wróciłeś w jednym kawałku. To tu nowość."
+      ]
+    },
+    "brann": {
+      "name": "Brann Węgloręki",
+      "lines": [
+        "Nie dotykaj kuźni. Nie dotykaj ostrzy. Gadaj, jeśli musisz.",
+        "Przynieś mi kiedyś żelazo wyrwy z głębokiego kurhanu. Wykuję ci coś, co śpiewa."
+      ]
+    }
+  },
+  "items": [
+    { "name": "Ostrze Wyrwy", "slot": "weapon", "rarity": "unique", "affixes": [ { "stat": "dmg", "value": 18 }, { "stat": "speed", "value": 8 } ] },
+    { "name": "Kirys z Pustego Kurhanu", "slot": "armor", "rarity": "rare", "affixes": [ { "stat": "hp", "value": 40 }, { "stat": "regen", "value": 1.5 } ] },
+    { "name": "Talizman Żarowarty", "slot": "charm", "rarity": "magic", "affixes": [ { "stat": "mana", "value": 14 }, { "stat": "regen", "value": 0.8 } ] }
+  ],
+  "dropChance": 10
+}

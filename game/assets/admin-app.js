@@ -65,7 +65,31 @@ const DEFAULT_DIALOGS = {
   ]
 }
 
-// stan
+// ---------- baza gry w PLIKU (game/data/gamedata.json) + API serwera ----------
+let GD = null // baza gry z pliku
+let apiOK = false // czy działa serwer.py z API zapisu
+async function loadGD() {
+  try {
+    const r = await fetch('data/gamedata.json', { cache: 'no-store' })
+    if (r.ok) GD = await r.json()
+  } catch {}
+  try {
+    const p = await fetch('api/ping', { cache: 'no-store' })
+    apiOK = p.ok
+  } catch { apiOK = false }
+}
+async function saveFile(path, content) {
+  const r = await fetch('api/save', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path, content })
+  })
+  const d = await r.json().catch(() => ({}))
+  if (!r.ok || !d.ok) throw new Error(d.error || 'HTTP ' + r.status)
+  return d
+}
+
+// stan (sesja: sakwa/quick-db)
 let db = lsGet('wt.db', null) || { items: [], dropChance: 10 }
 if (!Array.isArray(db.items)) db.items = []
 if (typeof db.dropChance !== 'number') db.dropChance = 10 // 0–100 (%)
@@ -475,52 +499,65 @@ function renderModels() {
   })
 }
 
-// ==================== ZAKŁADKA: DIALOGI ====================
+// ==================== ZAKŁADKA: DIALOGI (baza gry = plik) ====================
+function gdNpc(id) {
+  if (GD && GD.npcs && GD.npcs[id]) return GD.npcs[id]
+  return { name: (NPCS.find((n) => n.id === id) || {}).name, lines: DEFAULT_DIALOGS[id] }
+}
 function renderDialogs() {
-  const dialogs = lsGet('wt.dialogs', {})
+  if (!GD) {
+    $('#tab-dialogs').innerHTML = '<div class="card"><h3>Dialogi / NPC</h3><div class="hint">Brak pliku <b>data/gamedata.json</b> — daj F5.</div></div>'
+    return
+  }
   $('#tab-dialogs').innerHTML = `
-  <div class="hint" style="margin:0 0 14px">Edytor pokazuje <b>aktualne kwestie z gry</b> — edytuj je i włącz NADPISZ. Zmiany działają <b>na żywo</b> (rozmawiaj z NPC bez F5). Puste włączone nadpisanie = NPC milczy. „✎ z aktualnych” kopiuje domyślne kwestie do edycji.</div>
+  <div class="hint" style="margin:0 0 14px">Edytujesz <b>bazę gry</b> (plik <b>game/data/gamedata.json</b> — trwale, wchodzi do repo). Zmiany widzi gra po <b>F5</b>${apiOK ? '' : ' — ale <b>brak serwera z API</b>: odpal <b>python3 serwer.py</b> zamiast http.server, żeby móc zapisywać pliki'}. Jedna linia = jedna kwestia.</div>
   ${NPCS.map((n) => {
-    const ov = dialogs[n.id] || {}
-    const isDefault = !ov.lines || !ov.lines.length
-    const lines = isDefault ? DEFAULT_DIALOGS[n.id].join('\n') : ov.lines.join('\n')
+    const cur = gdNpc(n.id)
+    const lines = (cur.lines || []).join('\n')
     return `<div class="card npc-card" data-npc="${n.id}">
       <div class="head"><b>${esc(n.name)}</b><span class="id">id: ${n.id}</span>
-        <span class="badge" style="${isDefault ? '' : 'background:rgba(74,222,128,.12);border-color:#3f6212;color:#86efac'}">${isDefault ? 'aktualne z gry' : 'nadpisane'}</span>
-        <button class="btn" data-npccopy="${n.id}" style="margin-left:auto;padding:4px 10px;font-size:9px" title="skopiuj aktualne kwestie z gry do edycji">✎ z aktualnych</button>
-        <span style="display:flex;align-items:center;gap:6px;font-size:10px;color:#a1a1aa">NADPISZ
-        <input type="checkbox" data-npcen="${n.id}" ${ov.enabled ? 'checked' : ''} style="accent-color:#a855f7;width:16px;height:16px"></span></div>
+        <button class="btn" data-npccopy="${n.id}" style="margin-left:auto;padding:4px 10px;font-size:9px">✎ domyślne z gry</button></div>
       <label>nazwa wyświetlana</label>
-      <input type="text" data-npcname="${n.id}" value="${esc(ov.name || n.name)}" maxlength="40">
+      <input type="text" data-npcname="${n.id}" value="${esc(cur.name || n.name)}" maxlength="40">
       <label style="margin-top:8px">kwestie (jedna linia = jedna kwestia)</label>
-      <textarea data-npclines="${n.id}" rows="4">${esc(lines)}</textarea>
+      <textarea data-npclines="${n.id}" rows="5">${esc(lines)}</textarea>
     </div>`
   }).join('')}
+  <div class="row-flex">
+    <button class="btn green" id="dlg-save" ${apiOK ? '' : 'disabled'}>💾 Zapisz do pliku gamedata.json</button>
+    <button class="btn gold" id="dlg-download">⬇ Pobierz gamedata.json</button>
+  </div>
   <div id="app-msg" class="msg"></div>`
 
-  const upd = (id) => {
+  const collect = (id) => {
     const card = $(`[data-npc="${id}"]`)
-    const en = $(`[data-npcen="${id}"]`, card).checked
-    const name = $(`[data-npcname="${id}"]`, card).value.trim() || NPCS.find((n) => n.id === id).name
-    const lines = $(`[data-npclines="${id}"]`, card).value.split('\n').map((l) => l.trim()).filter(Boolean)
-    const dialogs2 = lsGet('wt.dialogs', {})
-    dialogs2[id] = { enabled: en, name, lines }
-    lsSet('wt.dialogs', dialogs2)
-    msg((en ? 'Nadpisano' : 'Wyłączono nadpisanie') + ' dialog: ' + name)
+    return {
+      name: $(`[data-npcname="${id}"]`, card).value.trim() || NPCS.find((n) => n.id === id).name,
+      lines: $(`[data-npclines="${id}"]`, card).value.split('\n').map((l) => l.trim()).filter(Boolean)
+    }
   }
+  $('#dlg-save').addEventListener('click', async () => {
+    try {
+      for (const n of NPCS) GD.npcs[n.id] = collect(n.id)
+      await saveFile('data/gamedata.json', JSON.stringify(GD, null, 2))
+      msg('Zapisano do game/data/gamedata.json — daj F5 w grze.')
+    } catch (e) { msg('Nie udało się zapisać: ' + e.message, true) }
+  })
+  $('#dlg-download').addEventListener('click', () => {
+    const g = clone(GD)
+    for (const n of NPCS) g.npcs[n.id] = collect(n.id)
+    const blob = new Blob([JSON.stringify(g, null, 2)], { type: 'application/json' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob); a.download = 'gamedata.json'; a.click(); URL.revokeObjectURL(a.href)
+    msg('Pobrano — nadpisz game/data/gamedata.json.')
+  })
   for (const n of NPCS) {
     const card = $(`[data-npc="${n.id}"]`)
-    const cpBtn = $(`[data-npccopy="${n.id}"]`, card)
-    if (cpBtn) cpBtn.addEventListener('click', () => {
-      const ta = $(`[data-npclines="${n.id}"]`, card)
-      ta.value = DEFAULT_DIALOGS[n.id].join('\n')
+    const cp = $(`[data-npccopy="${n.id}"]`, card)
+    if (cp) cp.addEventListener('click', () => {
+      $(`[data-npclines="${n.id}"]`, card).value = DEFAULT_DIALOGS[n.id].join('\n')
       $(`[data-npcname="${n.id}"]`, card).value = n.name
-      $(`[data-npcen="${n.id}"]`, card).checked = true
-      upd(n.id)
     })
-    $(`[data-npcen="${n.id}"]`, card).addEventListener('change', () => upd(n.id))
-    $(`[data-npcname="${n.id}"]`, card).addEventListener('change', () => upd(n.id))
-    $(`[data-npclines="${n.id}"]`, card).addEventListener('change', () => upd(n.id))
   }
 }
 
@@ -586,6 +623,82 @@ function renderChar() {
   }).join('') || '<div class="hint">(brak)</div>'
 }
 
+// ==================== ZAKŁADKA: BAZA GRY (plik) ====================
+const EDITABLE_FILES = [
+  'data/gamedata.json',
+  'assets/admin.js', 'assets/admin-app.js', 'assets/bridge.js',
+  'assets/index-FsptR_Zn.js', 'assets/index-BEkZlT_U.css',
+  'index.html', 'admin.html', 'serwer.py',
+  'assets/parts/p01.js', 'assets/parts/p02.js', 'assets/parts/p03.js', 'assets/parts/p04.js',
+  'assets/parts/p05.js', 'assets/parts/p06.js', 'assets/parts/p07.js', 'assets/parts/p08.js',
+  'assets/parts/p09.js', 'assets/parts/p10.js', 'assets/parts/p11.js', 'assets/parts/p12.js'
+]
+function renderGameDB() {
+  const apiNote = apiOK
+    ? '<span class="badge" style="background:rgba(74,222,128,.12);border-color:#3f6212;color:#86efac">serwer z API działa — zapisy idą do plików</span>'
+    : '<span class="badge" style="background:rgba(248,113,113,.1);border-color:#7f1d1d;color:#fca5a5">brak API — odpal: python3 serwer.py</span>'
+  $('#tab-gamedb').innerHTML = `
+  <div class="hint" style="margin:0 0 12px">Tu zmieniasz <b>samą grę</b>, nie stan partii: pliki na dysku (i potem git commit). ${apiNote}</div>
+  <div class="row-flex">
+    <div class="card" style="flex:1;min-width:300px"><h3>🗄 data/gamedata.json — baza gry</h3>
+      <textarea id="gdb-json" rows="18" spellcheck="false"></textarea>
+      <div class="row-flex" style="margin-top:10px">
+        <button class="btn green" id="gdb-save" ${apiOK ? '' : 'disabled'}>💾 Zapisz plik</button>
+        <button class="btn gold" id="gdb-dl">⬇ Pobierz</button>
+        <button class="btn" id="gdb-reload">↻ Przeładuj z dysku</button>
+      </div>
+      <div class="hint">NPC (dialogi), pula przedmiotów bazowych (items) i dropChance (% szansy przy zabójstwie).</div>
+    </div>
+    <div class="card" style="flex:1;min-width:300px"><h3>💻 Kod gry — edytor plików</h3>
+      <label>plik</label>
+      <select id="code-file">${EDITABLE_FILES.map((f) => `<option value="${f}">${f}</option>`).join('')}</select>
+      <textarea id="code-src" rows="14" spellcheck="false" style="margin-top:8px;font-family:monospace;font-size:11px"></textarea>
+      <div class="row-flex" style="margin-top:10px">
+        <button class="btn green" id="code-save" ${apiOK ? '' : 'disabled'}>💾 Zapisz plik</button>
+        <button class="btn" id="code-reload">↻ Przeładuj z dysku</button>
+      </div>
+      <div class="hint">Edytuj mody (admin/bridge), loader, HTML i części bundla. Po zapisie daj F5 w grze. Ostrożnie z parts/ — to zminifikowany kod gry.</div>
+    </div>
+  </div>
+  <div id="app-msg" class="msg"></div>`
+  const ta = $('#gdb-json')
+  ta.value = JSON.stringify(GD, null, 2)
+  $('#gdb-save').addEventListener('click', async () => {
+    try {
+      const parsed = JSON.parse(ta.value)
+      await saveFile('data/gamedata.json', JSON.stringify(parsed, null, 2))
+      GD = parsed
+      msg('Zapisano data/gamedata.json — F5 w grze.')
+    } catch (e) { msg('Błąd: ' + e.message, true) }
+  })
+  $('#gdb-dl').addEventListener('click', () => {
+    const blob = new Blob([ta.value], { type: 'application/json' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob); a.download = 'gamedata.json'; a.click(); URL.revokeObjectURL(a.href)
+  })
+  $('#gdb-reload').addEventListener('click', async () => {
+    await loadGD()
+    ta.value = JSON.stringify(GD, null, 2)
+    msg('Przeładowano z dysku.')
+  })
+  const cs = $('#code-src')
+  const loadFile = async () => {
+    try {
+      const r = await fetch($('#code-file').value, { cache: 'no-store' })
+      cs.value = r.ok ? await r.text() : 'nie udało się wczytać pliku'
+    } catch (e) { cs.value = 'błąd: ' + e.message }
+  }
+  $('#code-file').addEventListener('change', loadFile)
+  $('#code-reload').addEventListener('click', loadFile)
+  $('#code-save').addEventListener('click', async () => {
+    try {
+      await saveFile($('#code-file').value, cs.value)
+      msg('Zapisano ' + $('#code-file').value + ' — F5 w grze.')
+    } catch (e) { msg('Nie udało się zapisać: ' + e.message, true) }
+  })
+  loadFile()
+}
+
 // ==================== ZAKŁADKA: KOPIA ====================
 const BACKUP_KEYS = ['wt.save', 'wt.class', 'wt.gear', 'wt.inv', 'wt.db', 'wt.models', 'wt.dialogs', 'wt.stats', 'wt.mute', 'wt.starter']
 function renderBackup() {
@@ -649,6 +762,7 @@ function renderBackup() {
 const TABS = [
   { id: 'items', name: '🗡 Przedmioty', render: renderItems },
   { id: 'models', name: '🗿 Modele 3D', render: renderModels },
+  { id: 'gamedb', name: '🗄 Baza gry / Kod', render: renderGameDB },
   { id: 'dialogs', name: '💬 Dialogi / NPC', render: renderDialogs },
   { id: 'char', name: '🧍 Postać', render: renderChar },
   { id: 'backup', name: '💾 Kopia / Reset', render: renderBackup }
@@ -675,3 +789,4 @@ for (const t of TABS) {
 nav.firstChild.classList.add('act')
 $('#tab-items').classList.add('act')
 renderItems()
+loadGD().then(() => {})

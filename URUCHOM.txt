@@ -6,9 +6,9 @@ Warptracker PL — instrukcja uruchomienia
      Linux/macOS:  ./pobierz-modely.sh
      Windows:      pobierz-modely.bat
    (modele są CC0, pochodzą z warptracker.com — 8 plików GLB, ~3 MB)
-3. Wejdź do game/ i odpal serwer HTTP:
-     python3 -m http.server 8080     (Linux/macOS)
-     python -m http.server 8080      (Windows)
+3. Wejdź do game/ i odpal serwer (ma API zapisu dla panelu admina):
+     python3 serwer.py               (Linux/macOS)
+     python serwer.py                (Windows)
      npx serve .                     (alternatywa z Node.js)
 4. Otwórz w przeglądarce: http://localhost:8080
 

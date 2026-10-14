@@ -1,11 +1,8 @@
-// ===== Warptracker PL: mostek panelu admina (admin.html) + PAUZA (ESC) =====
+// ===== Warptracker PL: mostek gry ↔ panel admina + PAUZA (ESC) =====
+// Baza gry żyje w PLIKU game/data/gamedata.json (edytowany w panelu admina / admin.html).
+// Tu ją ładujemy i podłączamy do gry: dialogi NPC + pula dropów.
 ;(function () {
-  var DEFAULT_NAMES = {
-    serra: 'Strażniczka Serra',
-    marek: 'Stary Marek, Kronikarz',
-    vess: 'Vess, Szyjąca',
-    brann: 'Brann Węgloręki'
-  }
+  var GD = null // baza gry z pliku
 
   function readDialogs() {
     try {
@@ -14,15 +11,59 @@
     } catch (e) { return {} }
   }
 
-  // hook używany przez spatchowany bundle (getDialogue) — czytany przy KAŻDEJ rozmowie
+  // hook getDialogue (spatchowany bundle): kolejność = localStorage (live) > baza z pliku
   window.__wtDlgOv = function (npcId) {
     var ov = readDialogs()[npcId]
-    if (!ov || !ov.enabled || !Array.isArray(ov.lines) || !ov.lines.length) return null
-    return {
-      name: ov.name || DEFAULT_NAMES[npcId] || npcId,
-      lines: ov.lines.filter(function (l) { return typeof l === 'string' && l.trim() })
+    if (ov && ov.enabled && Array.isArray(ov.lines) && ov.lines.length) {
+      return { name: ov.name || npcId, lines: ov.lines.filter(function (l) { return typeof l === 'string' && l.trim() }) }
     }
+    if (GD && GD.npcs && GD.npcs[npcId]) {
+      var n = GD.npcs[npcId]
+      if (Array.isArray(n.lines) && n.lines.length) {
+        return { name: n.name || npcId, lines: n.lines.filter(function (l) { return typeof l === 'string' && l.trim() }) }
+      }
+    }
+    return null
   }
+
+  // załaduj bazę gry z pliku
+  fetch('data/gamedata.json')
+    .then(function (r) { return r.ok ? r.json() : null })
+    .then(function (d) { if (d && typeof d === 'object') GD = d })
+    .catch(function () {})
+
+  // przekaż bazę panelowi (admin.html działa w tej samej origin)
+  window.__wtGameData = function () { return GD }
+
+  // ---------- dropy z BAZY GRY (plik gamedata.json) ----------
+  function validGameItem(it) {
+    return it && typeof it === 'object' &&
+      ['weapon', 'armor', 'charm'].indexOf(it.slot) >= 0 &&
+      ['common', 'magic', 'rare', 'unique'].indexOf(it.rarity) >= 0 &&
+      typeof it.name === 'string' && it.name &&
+      Array.isArray(it.affixes) && it.affixes.length >= 1 && it.affixes.length <= 4 &&
+      it.affixes.every(function (a) { return a && ['dmg', 'hp', 'speed', 'mana', 'regen'].indexOf(a.stat) >= 0 && typeof a.value === 'number' && a.value > 0 && a.value <= 999 })
+  }
+  function hookDrops() {
+    var g = window.__WT
+    if (!g || !g.loot || g.loot.__fileHooked) return false
+    var L = g.loot
+    var orig = L.maybeDrop.bind(L)
+    L.maybeDrop = function (pos, lvl, kind) {
+      orig(pos, lvl, kind)
+      try {
+        var chance = (GD && typeof GD.dropChance === 'number') ? GD.dropChance / 100 : 0
+        var pool = (GD && Array.isArray(GD.items)) ? GD.items.filter(validGameItem) : []
+        if (chance > 0 && pool.length && Math.random() < chance) {
+          L.drop(pos, JSON.parse(JSON.stringify(pool[Math.floor(Math.random() * pool.length)])))
+        }
+      } catch (e) {}
+    }
+    L.__fileHooked = true
+    return true
+  }
+  var tries = 0
+  var t = setInterval(function () { if (hookDrops() || ++tries > 400) clearInterval(t) }, 500)
 
   // ---------- PAUZA pod ESC ----------
   var paused = false
@@ -30,7 +71,6 @@
   var origRAF = window.requestAnimationFrame.bind(window)
   var overlay = null
 
-  // brama na requestAnimationFrame: wstrzymane klatki trafiają do kolejki
   window.requestAnimationFrame = function (cb) {
     if (paused) { queue.push(cb); return 0 }
     return origRAF(cb)
@@ -66,23 +106,20 @@
     var ov = ensureOverlay()
     if (paused) {
       ov.classList.add('show')
-      // wycisz dźwięki gry na czas pauzy
-      try { if (window.__WT && window.__WT.mute) window.__WT.mute(true) } catch (e) {}
     } else {
       ov.classList.remove('show')
-      try { if (window.__WT && window.__WT.mute) window.__WT.mute(false) } catch (e) {}
       resumeQueue()
     }
   }
 
   window.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape' || e.repeat) return
-    if (quickPanelOpen()) return           // niech panel zamknie się normalnie
+    if (quickPanelOpen()) return
     e.preventDefault()
     togglePause()
   })
 
-  // live-sync z osobną stroną admina
+  // live-sync z panelem admina
   try {
     var ch = new BroadcastChannel('wt-admin')
     ch.onmessage = function (ev) {
