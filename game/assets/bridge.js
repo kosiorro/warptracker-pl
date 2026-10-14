@@ -920,7 +920,7 @@
     root.add(chapel)
 
     // beczki, stół, ławy przy ognisku
-    [[-2.2, 2.6], [-2.9, 2.0], [2.8, -2.4]].forEach(function (bp) {
+    ;[[-2.2, 2.6], [-2.9, 2.0], [2.8, -2.4]].forEach(function (bp) {
       var b = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.7, 9), woodDark)
       b.position.set(TOWN.x + bp[0], 0.35, TOWN.z + bp[1])
       b.rotation.y = bp[0]
@@ -941,7 +941,7 @@
     })
 
     // drzewa i krzewy na obrzeżach obozu
-    [[12.4, 3.2, 1], [-11.6, -4.4, 1.2], [-2.0, 12.6, 0.9], [10.2, 11.0, 1.1], [-12.2, 7.0, 1], [4.6, -12.4, 0.8]].forEach(function (tp) {
+    ;[[12.4, 3.2, 1], [-11.6, -4.4, 1.2], [-2.0, 12.6, 0.9], [10.2, 11.0, 1.1], [-12.2, 7.0, 1], [4.6, -12.4, 0.8]].forEach(function (tp) {
       var tr = new THREE.Group()
       var trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.2, 1.6, 5), woodDark)
       trunk.position.y = 0.8; tr.add(trunk)
