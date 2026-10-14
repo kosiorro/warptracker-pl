@@ -680,104 +680,181 @@
     root.name = 'wt-town'
     console.log('[wt] buduję Osadę Żarowarta (v7)…')
 
-    var wood = new THREE.MeshStandardMaterial({ color: 0x6e4a2c, roughness: 1 })
+    var wood = new THREE.MeshStandardMaterial({ color: 0x6b4226, roughness: 1 })
     var woodDark = new THREE.MeshStandardMaterial({ color: 0x4a3018, roughness: 1 })
-    var canvasM = new THREE.MeshStandardMaterial({ color: 0x7a5c3a, roughness: 1 })
-    var stone = new THREE.MeshStandardMaterial({ color: 0x57534e, roughness: 1 })
-    var flame = new THREE.MeshBasicMaterial({ color: 0xff9a3c, transparent: true, opacity: 0.9 })
+    var daub = new THREE.MeshStandardMaterial({ color: 0x7d6b4f, roughness: 1 })
+    var thatch = new THREE.MeshStandardMaterial({ color: 0x8a6d3b, roughness: 1 })
+    var stoneM = new THREE.MeshStandardMaterial({ color: 0x635d55, roughness: 1 })
+    var stoneDark = new THREE.MeshStandardMaterial({ color: 0x4e4a44, roughness: 1 })
+    var windowM = new THREE.MeshBasicMaterial({ color: 0xffc15e })
+    var doorM = new THREE.MeshStandardMaterial({ color: 0x3a2314, roughness: 1 })
+    var hayM = new THREE.MeshStandardMaterial({ color: 0xb08d3f, roughness: 1 })
+    var flameM = new THREE.MeshBasicMaterial({ color: 0xff9a3c, transparent: true, opacity: 0.95 })
+    var bannerM = new THREE.MeshBasicMaterial({ color: 0x7c2d12, side: 2 })
+    var fireLights = []
 
-    // ---- palisada: pierścień pali z bramą od strony świata (-x,-z) ----
-    var logs = 34
-    var gateAng = Math.atan2(-1, -1) // kierunek u_ (wyjście z obozu)
-    for (var i = 0; i < logs; i++) {
-      var ang = (i / logs) * Math.PI * 2
-      var dAng = Math.atan2(Math.sin(ang - gateAng), Math.cos(ang - gateAng))
-      if (Math.abs(dAng) < 0.28) continue // brama
-      var log = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.3, 2.4 + (i % 3) * 0.25, 6), i % 2 ? wood : woodDark)
-      log.position.set(TOWN.x + Math.cos(ang) * TOWN.r, 1.2, TOWN.z + Math.sin(ang) * TOWN.r)
-      log.rotation.z = (i % 5 - 2) * 0.02
-      root.add(log)
+    // ---- plac: bruk wokół ogniska ----
+    var plaza = new THREE.Mesh(new THREE.CircleGeometry(6.5, 24), stoneDark)
+    plaza.rotation.x = -Math.PI / 2
+    plaza.position.set(TOWN.x, 0.02, TOWN.z)
+    root.add(plaza)
+    var plaza2 = new THREE.Mesh(new THREE.CircleGeometry(5.6, 24), stoneM)
+    plaza2.rotation.x = -Math.PI / 2
+    plaza2.position.set(TOWN.x, 0.035, TOWN.z)
+    root.add(plaza2)
+    var rim = new THREE.Mesh(new THREE.RingGeometry(6.3, 6.7, 24), new THREE.MeshStandardMaterial({ color: 0x2e2a26, roughness: 1 }))
+    rim.rotation.x = -Math.PI / 2
+    rim.position.set(TOWN.x, 0.05, TOWN.z)
+    root.add(rim)
+
+    // ---- domy: ściany z ubitej gliny, słomiane dachy, świecące okna ----
+    function buildHouse(dx, dz, rot) {
+      var h = new THREE.Group()
+      var wall = new THREE.Mesh(new THREE.BoxGeometry(3.6, 2.2, 4.6), daub)
+      wall.position.y = 1.1
+      h.add(wall)
+      var plinth = new THREE.Mesh(new THREE.BoxGeometry(3.9, 0.35, 4.9), woodDark)
+      plinth.position.y = 0.17
+      h.add(plinth)
+      var roof = new THREE.Mesh(new THREE.ConeGeometry(3.1, 1.7, 4), thatch)
+      roof.position.y = 3.0
+      roof.rotation.y = Math.PI / 4
+      h.add(roof)
+      var chim = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.5, 0.5), stoneM)
+      chim.position.set(1.2, 2.7, -1.4)
+      h.add(chim)
+      var door = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 1.5), doorM)
+      door.position.set(-0.6, 0.95, 2.32)
+      h.add(door)
+      var win1 = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 0.6), windowM)
+      win1.position.set(0.9, 1.4, 2.32)
+      h.add(win1)
+      var win2 = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 0.6), windowM)
+      win2.position.set(1.82, 1.4, -0.6)
+      win2.rotation.y = Math.PI / 2
+      h.add(win2)
+      h.position.set(TOWN.x + dx, 0, TOWN.z + dz)
+      h.rotation.y = rot
+      root.add(h)
     }
-    // słupy bramy
-    for (var s = -1; s <= 1; s += 2) {
-      var gAng = gateAng + s * 0.34
-      var post = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.32, 3.1, 6), woodDark)
-      post.position.set(TOWN.x + Math.cos(gAng) * TOWN.r, 1.55, TOWN.z + Math.sin(gAng) * TOWN.r)
-      root.add(post)
+    buildHouse(-9.5, -3, -0.4)
+    buildHouse(9.5, -4, 0.5)
+    buildHouse(-8.5, 6, 3.0)
+    buildHouse(9.5, 6, -2.8)
+    buildHouse(3.5, -10.5, 0.15)
+    buildHouse(-4, -10.5, -0.2)
+
+    // ---- pochodnie wokół placu (migoczące światła) ----
+    function buildTorch(dx, dz, withLight) {
+      var pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 2.2, 5), woodDark)
+      pole.position.set(TOWN.x + dx, 1.1, TOWN.z + dz)
+      root.add(pole)
+      var bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.09, 0.18, 6), stoneM)
+      bowl.position.set(TOWN.x + dx, 2.25, TOWN.z + dz)
+      root.add(bowl)
+      var fl = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.45, 6), flameM)
+      fl.position.set(TOWN.x + dx, 2.55, TOWN.z + dz)
+      root.add(fl)
+      fireFlames.push(fl)
+      if (withLight) {
+        var li = new THREE.PointLight(0xff8a3c, 5, 9, 2)
+        li.position.set(TOWN.x + dx, 2.7, TOWN.z + dz)
+        root.add(li)
+        fireLights.push({ light: li, base: 5 })
+      }
+    }
+    for (var ti = 0; ti < 8; ti++) {
+      var ta = ti * Math.PI / 4
+      buildTorch(Math.cos(ta) * 7, Math.sin(ta) * 7, ti % 2 === 0)
     }
 
-    // ---- ognisko na środku ----
-    var fx = TOWN.x, fz = TOWN.z + 3
-    for (var st = 0; st < 7; st++) {
-      var a2 = (st / 7) * Math.PI * 2
-      var rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.28, 0), stone)
-      rock.position.set(fx + Math.cos(a2) * 0.85, 0.14, fz + Math.sin(a2) * 0.85)
-      root.add(rock)
+    // ---- wieża strażnicza przy bramie ----
+    var tw = new THREE.Group()
+    for (var lx = -1; lx <= 1; lx += 2) for (var lz = -1; lz <= 1; lz += 2) {
+      var leg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 3.4, 5), woodDark)
+      leg.position.set(lx * 0.8, 1.7, lz * 0.8)
+      tw.add(leg)
     }
-    for (var lw = 0; lw < 3; lw++) {
-      var stick = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 1.5, 5), woodDark)
-      stick.position.set(fx, 0.32, fz)
-      stick.rotation.z = Math.PI / 2.6
-      stick.rotation.y = (lw / 3) * Math.PI * 2
-      root.add(stick)
+    var deck = new THREE.Mesh(new THREE.BoxGeometry(2, 0.16, 2), wood)
+    deck.position.y = 3.4
+    tw.add(deck)
+    for (var rx = -1; rx <= 1; rx += 2) for (var rz = -1; rz <= 1; rz += 2) {
+      var rail = new THREE.Mesh(new THREE.BoxGeometry(rx ? 0.08 : 2, 0.5, rz ? 0.08 : 2), woodDark)
+      rail.position.set(rx * 0.96, 3.8, rz * 0.96)
+      tw.add(rail)
     }
-    for (var fl = 0; fl < 3; fl++) {
-      var fmesh = new THREE.Mesh(new THREE.ConeGeometry(0.34 - fl * 0.09, 0.9 + fl * 0.25, 6), flame.clone())
-      fmesh.position.set(fx, 0.55 + fl * 0.22, fz)
-      root.add(fmesh)
-      fireFlames.push(fmesh)
-    }
-    try {
-      fireLight = new THREE.PointLight(0xff8a3c, 14, 16, 2)
-      fireLight.position.set(fx, 1.4, fz)
-      root.add(fireLight)
-    } catch (e) { fireLight = null }
+    var twRoof = new THREE.Mesh(new THREE.ConeGeometry(1.7, 0.9, 4), thatch)
+    twRoof.position.y = 4.6
+    twRoof.rotation.y = Math.PI / 4
+    tw.add(twRoof)
+    var twFl = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.55, 6), flameM)
+    twFl.position.y = 3.9
+    tw.add(twFl)
+    fireFlames.push(twFl)
+    var twLi = new THREE.PointLight(0xff8a3c, 6, 10, 2)
+    twLi.position.y = 4.2
+    tw.add(twLi)
+    fireLights.push({ light: twLi, base: 6 })
+    var gateA = Math.atan2(-1, -1)
+    tw.position.set(TOWN.x + Math.cos(gateA) * 10.4, 0, TOWN.z + Math.sin(gateA) * 10.4)
+    root.add(tw)
 
-    // ---- namioty ----
-    var tents = [[TOWN.x - 7, TOWN.z - 6, 0.4], [TOWN.x + 7.5, TOWN.z - 5, 2.4], [TOWN.x - 2, TOWN.z + 8.5, -0.6]]
-    tents.forEach(function (tp) {
-      var t = new THREE.Mesh(new THREE.ConeGeometry(2.3, 2.5, 4), canvasM)
-      t.position.set(tp[0], 1.25, tp[1])
-      t.rotation.y = tp[2]
-      root.add(t)
-      var peg = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 1.4, 4), woodDark)
-      peg.position.set(tp[0] + 1.2, 0.7, tp[1] + 1.2)
-      peg.rotation.z = 0.5
-      root.add(peg)
+    // ---- wóz z sianem ----
+    var cart = new THREE.Group()
+    var bed = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.14, 2.2), wood)
+    bed.position.y = 0.75
+    cart.add(bed)
+    for (var wcx = -1; wcx <= 1; wcx += 2) {
+      var wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.12, 10), woodDark)
+      wheel.rotation.z = Math.PI / 2
+      wheel.position.set(wcx * 0.72, 0.55, 0)
+      cart.add(wheel)
+    }
+    var shaft = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 1.6), woodDark)
+    shaft.position.set(0.3, 0.5, -1.8)
+    cart.add(shaft)
+    var shaft2 = shaft.clone()
+    shaft2.position.x = -0.3
+    cart.add(shaft2)
+    var hay = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.5, 0.8), hayM)
+    hay.position.set(0, 1.05, 0.5)
+    cart.add(hay)
+    cart.position.set(TOWN.x + 5.5, 0, TOWN.z + 6.5)
+    cart.rotation.y = 0.7
+    root.add(cart)
+
+    // ---- snopki siana, skrzynie, sztandar ----
+    var hays = [[-6.5, -2.5], [5, -9.5]]
+    hays.forEach(function (hp) {
+      var bale = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.8, 7), hayM)
+      bale.rotation.z = Math.PI / 2
+      bale.position.set(TOWN.x + hp[0], 0.45, TOWN.z + hp[1])
+      root.add(bale)
     })
-
-    // ---- skrzynie i beczki ----
-    var crates = [[TOWN.x + 5, TOWN.z + 5.5, 0.7], [TOWN.x + 5.8, TOWN.z + 6.7, 0.55], [TOWN.x - 5.5, TOWN.z + 3, 0.6]]
+    var crates = [[3, 4.2, 0.7], [3.9, 4.9, 0.55], [-4.2, 4.6, 0.6]]
     crates.forEach(function (cp) {
       var c = new THREE.Mesh(new THREE.BoxGeometry(cp[2], cp[2], cp[2]), wood)
-      c.position.set(cp[0], cp[2] / 2, cp[1])
+      c.position.set(TOWN.x + cp[0], cp[2] / 2, TOWN.z + cp[1])
       c.rotation.y = cp[0]
       root.add(c)
     })
-    var barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 1, 8), woodDark)
-    barrel.position.set(TOWN.x - 4.5, 0.5, TOWN.z + 6)
-    root.add(barrel)
-
-    // ---- sztandar przy bramie ----
     var bPole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 4.4, 5), woodDark)
-    bPole.position.set(TOWN.x + Math.cos(gateAng + 0.5) * (TOWN.r - 0.4), 2.2, TOWN.z + Math.sin(gateAng + 0.5) * (TOWN.r - 0.4))
+    bPole.position.set(TOWN.x - 7.8, 2.2, TOWN.z - 11.6)
     root.add(bPole)
-    var flag = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 0.7), new THREE.MeshBasicMaterial({ color: 0x7c2d12, side: 2 }))
-    flag.position.copy(bPole.position)
-    flag.position.y = 3.7
-    flag.position.x += 0.6
-    root.add(flag)
+    var bFlag = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 0.7), bannerM)
+    bFlag.position.set(TOWN.x - 7.2, 3.7, TOWN.z - 11.6)
+    root.add(bFlag)
 
     scene.add(root)
     townDone = true
-    console.log('[wt] Osada Żarowarta zbudowana ✓ (palisada, ognisko, namioty)')
+    console.log('[wt] Osada Żarowarta rozbudowana ✓ (plac, 6 domów, 8 pochodni, wieża, wóz)')
 
-    // ognisko: migotanie (lekki interval — nie blokuje pauzy)
+    // migotanie ognia i pochodni
     setInterval(function () {
-      if (fireLight) fireLight.intensity = 12 + Math.random() * 6
-      for (var i = 0; i < fireFlames.length; i++) {
-        fireFlames[i].scale.y = 0.85 + Math.random() * 0.3
-        fireFlames[i].rotation.y += 0.2
+      for (var i = 0; i < fireLights.length; i++) fireLights[i].light.intensity = fireLights[i].base * (0.85 + Math.random() * 0.3)
+      for (var j = 0; j < fireFlames.length; j++) {
+        fireFlames[j].scale.y = 0.85 + Math.random() * 0.3
+        fireFlames[j].rotation.y += 0.2
       }
     }, 160)
 
