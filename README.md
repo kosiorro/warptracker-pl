@@ -63,11 +63,11 @@ Gra może działać też online przez GitHub Pages. Pages serwuje tylko katalog 
 Pełna wersja panelu z zakładkami (skrót P w grze zostaje jako szybki edytor przedmiotów):
 - **Przedmioty** — baza, zakładanie, sakwa, import/eksport, podgląd 3D, szansa dropów z bazy (na żywo)
 - **Modele 3D** — lista własnych .glb
-- **Dialogi / NPC** — nadpisywanie kwestii Serry, Marka, Vess i Branna (**na żywo**, bez F5)
+- **Dialogi / NPC** — edytor z **aktualnymi kwestiami z gry**, nadpisywanie Serry, Marka, Vess i Branna (**na żywo**, bez F5)
 - **Postać** — klasa, poziom, XP, rozdział fabuły, łowy, reset postaci
 - **Kopia / Reset** — eksport i import całego stanu gry
 
-Strona i gra dzielą localStorage (ten sam serwer) — najlepiej trzymać je w dwóch kartach obok siebie. Dialogi i dropy działają natychmiast; postać/ekwipunek wymagają F5 w grze. Podgląd 3D na stronie korzysta z CDN three.js (bez internetu reszta panelu działa normalnie).
+Strona i gra dzielą localStorage (ten sam serwer) — najlepiej trzymać je w dwóch kartach obok siebie. Przycisk **Pauza** w nagłówku panelu (i **ESC** w grze) zamraża/wznawia grę z poziomu panelu. Dialogi i dropy działają natychmiast; postać/ekwipunek wymagają F5 w grze. Podgląd 3D na stronie korzysta z CDN three.js (bez internetu reszta panelu działa normalnie).
 
 ## Własne modele 3D (.glb)
 
@@ -82,7 +82,7 @@ Brakujący plik `.glb` jest pomijany z ostrzeżeniem w konsoli (gra nie odmówi 
 
 - **WASD** — ruch, **mysz** — celowanie, **LPM** — combo mieczem
 - **SPACE** — unik (i-frames), **1/2/3** — umiejętności, **E** — rozmowa
-- **C / I** — karta postaci, **P** — panel admina, **M** — dźwięk, **kółko** — zoom
+- **C / I** — karta postaci, **P** — panel admina, **ESC** — pauza, **M** — dźwięk, **kółko** — zoom
 
 ## Licencje i podziękowania
 

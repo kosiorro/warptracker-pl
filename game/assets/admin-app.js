@@ -34,6 +34,36 @@ const NPCS = [
   { id: 'vess', name: 'Vess, Szyjąca' },
   { id: 'brann', name: 'Brann Węgloręki' }
 ]
+// domyślne kwestie wyciągnięte z gry (wszystkie warianty fabularne, deduplikowane)
+const DEFAULT_DIALOGS = {
+  serra: [
+    'Osiem. Policz je, albo bagna policzą ciebie.',
+    'Kolejny Tropicielu. Dobrze. Poprzedni wrócił w kawałkach.',
+    'Bagna roi się od pomiotów wyrwy. Przerzedź ich szeregi — osiem łbów — a uwierzę, że twój miecz to coś więcej niż gładź.',
+    'Umiesz więc ugryźć. Pomioty wylewają się z iglic — czarnych gwoździ, które wyrwa wbija w ziemię.',
+    'Trzy górują nad bagnami. Ich wardy pękają, gdy zginą ich strażnicy. Rozbij wszystkie trzy.',
+    'Bagna są ciche. Ale ziemia wciąż dudni, Tropicielu. Porozmawiaj z Markiem — on też to poczuł.',
+    'Warda iglicy ginie razem ze strażnikami. Zabij watahę, a potem rozbij kamień.',
+    'Bagna nigdy nie zostają czyste. Zawsze są nowe łowy.',
+    'Cztery pieczęcie, czysto. Bagna znów się wypełnią — zawsze tak bywa.'
+  ],
+  marek: [
+    'Usiądź na chwilę przy ogniu, Tropicielu. Posłuchaj.',
+    'Wyrwy to nie rany. Rany się zamykają. To drzwi — a drzwi ktoś trzyma otwarte.',
+    'Pod kurhanem coś zakotwicza je wszystkie. Serce nurtu. Rozbij je, a bagna znów zaczną oddychać.',
+    'Czujesz, że umarło? To był jeden węzeł na jednej nitce. Nurt płynie skądś, gdzie jest o wiele ciemniej. Odpocznij. Potem pójdziemy za nim.',
+    'Kurhan leży na dalekim skraju bagien, za szubienicznym drzewem. Zejdź starą drogą.'
+  ],
+  vess: [
+    'Krwawisz? Siadaj. Mam nitkę i ogień, a żadne z nich nie obchodzi, ile wrzeszczysz.',
+    'Wyrwa zostawia ślady pod skórą. Twoje są… płytkie. Tak to zostaw.',
+    'Wróciłeś w jednym kawałku. To tu nowość.'
+  ],
+  brann: [
+    'Nie dotykaj kuźni. Nie dotykaj ostrzy. Gadaj, jeśli musisz.',
+    'Przynieś mi kiedyś żelazo wyrwy z głębokiego kurhanu. Wykuję ci coś, co śpiewa.'
+  ]
+}
 
 // stan
 let db = lsGet('wt.db', null) || { items: [], dropChance: 10 }
@@ -54,12 +84,20 @@ function msg(text, err = false) {
 }
 
 // ---------- status gry (BroadcastChannel) ----------
+let pausedByGame = false
 let ch = null
 try {
   ch = new BroadcastChannel('wt-admin')
   ch.onmessage = (ev) => {
+    if (ev.data && (ev.data.type === 'pause' || ev.data.type === 'unpause')) {
+      pausedByGame = ev.data.type === 'pause'
+      const pb = $('#pause-btn')
+      if (pb) { pb.textContent = pausedByGame ? '▶ Wznów grę' : '⏸ Pauza (ESC)'; pb.dataset.on = pausedByGame ? '1' : '' }
+    }
     if (ev.data && ev.data.type === 'pong') {
       const s = $('#game-status')
+      const pb = $('#pause-btn')
+      if (pb) { pb.textContent = (pausedByGame ? '▶ Wznów grę' : '⏸ Pauza (ESC)'); pb.dataset.on = pausedByGame ? '1' : '' }
       s.textContent = '● gra wykryta — zmiany widać na żywo'
       s.className = 'status on'
       clearTimeout(ch._t)
@@ -71,6 +109,14 @@ try {
   }
   setInterval(() => ch.postMessage({ type: 'ping' }), 2000)
 } catch {}
+document.addEventListener('DOMContentLoaded', () => {})
+const _pb = () => document.getElementById('pause-btn')
+if (_pb()) _pb().addEventListener('click', () => {
+  const on = _pb().dataset.on === '1'
+  _pb().dataset.on = on ? '' : '1'
+  _pb().textContent = on ? '⏸ Pauza (ESC)' : '▶ Wznów grę'
+  try { ch && ch.postMessage({ type: on ? 'unpause' : 'pause' }) } catch {}
+})
 
 // ---------- podgląd 3D ----------
 const pv = { renderer: null, scene: null, camera: null, root: null, drag: null, loader: GLTFLoader ? new GLTFLoader() : null }
@@ -433,13 +479,16 @@ function renderModels() {
 function renderDialogs() {
   const dialogs = lsGet('wt.dialogs', {})
   $('#tab-dialogs').innerHTML = `
-  <div class="hint" style="margin:0 0 14px">Zmiany działają <b>na żywo</b> — rozmawiaj z NPC w grze bez odświeżania. Puste włączone nadpisanie = NPC milczy.</div>
+  <div class="hint" style="margin:0 0 14px">Edytor pokazuje <b>aktualne kwestie z gry</b> — edytuj je i włącz NADPISZ. Zmiany działają <b>na żywo</b> (rozmawiaj z NPC bez F5). Puste włączone nadpisanie = NPC milczy. „✎ z aktualnych” kopiuje domyślne kwestie do edycji.</div>
   ${NPCS.map((n) => {
     const ov = dialogs[n.id] || {}
-    const lines = (ov.lines || []).join('\n')
+    const isDefault = !ov.lines || !ov.lines.length
+    const lines = isDefault ? DEFAULT_DIALOGS[n.id].join('\n') : ov.lines.join('\n')
     return `<div class="card npc-card" data-npc="${n.id}">
       <div class="head"><b>${esc(n.name)}</b><span class="id">id: ${n.id}</span>
-        <span style="margin-left:auto;display:flex;align-items:center;gap:6px;font-size:10px;color:#a1a1aa">NADPISZ
+        <span class="badge" style="${isDefault ? '' : 'background:rgba(74,222,128,.12);border-color:#3f6212;color:#86efac'}">${isDefault ? 'aktualne z gry' : 'nadpisane'}</span>
+        <button class="btn" data-npccopy="${n.id}" style="margin-left:auto;padding:4px 10px;font-size:9px" title="skopiuj aktualne kwestie z gry do edycji">✎ z aktualnych</button>
+        <span style="display:flex;align-items:center;gap:6px;font-size:10px;color:#a1a1aa">NADPISZ
         <input type="checkbox" data-npcen="${n.id}" ${ov.enabled ? 'checked' : ''} style="accent-color:#a855f7;width:16px;height:16px"></span></div>
       <label>nazwa wyświetlana</label>
       <input type="text" data-npcname="${n.id}" value="${esc(ov.name || n.name)}" maxlength="40">
@@ -461,6 +510,14 @@ function renderDialogs() {
   }
   for (const n of NPCS) {
     const card = $(`[data-npc="${n.id}"]`)
+    const cpBtn = $(`[data-npccopy="${n.id}"]`, card)
+    if (cpBtn) cpBtn.addEventListener('click', () => {
+      const ta = $(`[data-npclines="${n.id}"]`, card)
+      ta.value = DEFAULT_DIALOGS[n.id].join('\n')
+      $(`[data-npcname="${n.id}"]`, card).value = n.name
+      $(`[data-npcen="${n.id}"]`, card).checked = true
+      upd(n.id)
+    })
     $(`[data-npcen="${n.id}"]`, card).addEventListener('change', () => upd(n.id))
     $(`[data-npcname="${n.id}"]`, card).addEventListener('change', () => upd(n.id))
     $(`[data-npclines="${n.id}"]`, card).addEventListener('change', () => upd(n.id))
