@@ -192,7 +192,7 @@
   }
 
   // --- zapis / wczytanie: migawka stanu gry w localStorage ---
-  var SNAP_KEYS = ['wt.save', 'wt.class', 'wt.gear', 'wt.inv', 'wt.stats', 'wt.starter', 'wt.gold', 'wt.db', 'wt.dialogs', 'wt.mute']
+  var SNAP_KEYS = ['wt.save', 'wt.class', 'wt.gear', 'wt.inv', 'wt.stats', 'wt.starter', 'wt.gold', 'wt.db', 'wt.dialogs', 'wt.mute', 'wt.fog']
   function slotKey(n) { return 'wt.slot' + n }
   function saveSlot(n) {
     var data = {}
@@ -340,8 +340,9 @@
       '#wt-shop .sh-it .i-pr{margin-left:auto;color:#fbbf24;font-size:13px;white-space:nowrap}' +
       '#wt-shop .sh-empty{color:#71717a;font-size:13px;padding:22px;text-align:center;grid-column:1/-1}' +
       '#wt-shop .sh-hint{color:#52525b;font-size:11px;margin-top:12px;text-align:center;letter-spacing:.1em}' +
-      '.wt-shop-btn{display:inline-block;margin-top:10px;padding:7px 16px;font-family:Georgia,serif;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#fbbf24;background:rgba(46,22,74,.7);border:1px solid #92400e;border-radius:6px;cursor:pointer;transition:all .15s}' +
-      '.wt-shop-btn:hover{border-color:#fbbf24;box-shadow:0 0 14px rgba(251,191,36,.4);color:#fde68a}'
+      '.wt-shop-btn{display:block;margin:12px auto 0;padding:8px 22px;font-family:Georgia,serif;font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:#1c1408;background:linear-gradient(#e8d18a,#c9a24a);border:1px solid #a8863a;border-radius:6px;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.55),inset 0 1px 0 #ffffff66;transition:box-shadow .15s,transform .1s}' +
+      '.wt-shop-btn:hover{background:linear-gradient(#e8d18a,#c9a24a);color:#1c1408;box-shadow:0 0 14px rgba(232,209,138,.45),inset 0 1px 0 #ffffff66;transform:translateY(-1px)}' +
+      '.wt-shop-btn:active{transform:translateY(0)}'
     document.head.appendChild(st)
   }
 
@@ -440,20 +441,20 @@
     if (mapEl) return mapEl
     var st = document.createElement('style')
     st.textContent =
-      '#wt-map{position:fixed;inset:0;z-index:180;display:none;align-items:center;justify-content:center;background:rgba(5,2,8,.82);backdrop-filter:blur(2px);font-family:Georgia,serif}' +
+      '#wt-map{position:fixed;inset:0;z-index:180;display:none;align-items:center;justify-content:center;background:rgba(5,3,2,.85);backdrop-filter:blur(2px);font-family:Georgia,serif}' +
       '#wt-map.show{display:flex}' +
       '#wt-map .mp-box{display:flex;flex-direction:column;align-items:center;gap:10px}' +
-      '#wt-map .mp-title{color:#e9d5ff;letter-spacing:.34em;font-size:20px;text-shadow:0 0 18px #6b21a8}' +
-      '#wt-map canvas{background:#0d0815;border:1px solid #6b21a8;border-radius:10px;box-shadow:0 0 40px rgba(168,85,247,.3)}' +
-      '#wt-map .mp-legend{color:#a1a1aa;font-size:12px;letter-spacing:.08em;display:flex;gap:18px}' +
+      '#wt-map .mp-title{color:#d6d0c4;letter-spacing:.34em;font-size:20px;text-shadow:0 2px 4px #000}' +
+      '#wt-map canvas{background:#141110;border:1px solid #57534e;border-radius:10px;box-shadow:0 0 40px rgba(0,0,0,.6),inset 0 0 30px rgba(0,0,0,.5)}' +
+      '#wt-map .mp-legend{color:#a8a29e;font-size:12px;letter-spacing:.08em;display:flex;gap:18px}' +
       '#wt-map .mp-legend b{font-weight:normal}' +
-      '#wt-map .mp-hint{color:#52525b;font-size:11px;letter-spacing:.14em}'
+      '#wt-map .mp-hint{color:#78716c;font-size:11px;letter-spacing:.14em}'
     document.head.appendChild(st)
     mapEl = document.createElement('div')
     mapEl.id = 'wt-map'
     mapEl.innerHTML = '<div class="mp-box"><div class="mp-title">MAPA ŻAROWARTY</div><canvas width="560" height="560"></canvas>' +
       '<div class="mp-legend"><b style="color:#c084fc">◆ Ty</b><b style="color:#fbbf24">● NPC</b><b style="color:#ef4444">● wrogowie</b><b style="color:#d6d3d1">♦ łupy</b></div>' +
-      '<div class="mp-hint">TAB — zamknij mapę</div></div>'
+      '<div class="mp-hint">ciemne płyty = nieodkryty teren &middot; TAB — zamknij mapę</div></div>'
     document.body.appendChild(mapEl)
     mapCv = mapEl.querySelector('canvas')
     return mapEl
@@ -484,18 +485,35 @@
     return out
   }
 
+  // ---- mgła wojny: teren odkrywa się stopniowo, w miarę chodzenia ----
+  var FOG_KEY = 'wt.fog', FOG_STEP = 10, fogCells = null
+  function loadFog() {
+    if (fogCells) return fogCells
+    try { fogCells = new Set(JSON.parse(localStorage.getItem(FOG_KEY) || '[]')) } catch (e) { fogCells = new Set() }
+    return fogCells
+  }
+  function cellKey(ix, iz) { return ix + ',' + iz }
+  function cellOf(x, z) { return cellKey(Math.round(x / FOG_STEP), Math.round(z / FOG_STEP)) }
+  function visited(x, z) { return loadFog().has(cellOf(x, z)) }
+  function markFog(x, z) {
+    var f = loadFog()
+    var ix = Math.round(x / FOG_STEP), iz = Math.round(z / FOG_STEP)
+    var n = f.size
+    for (var dx = -1; dx <= 1; dx++) for (var dz = -1; dz <= 1; dz++) f.add(cellKey(ix + dx, iz + dz))
+    if (f.size !== n) lsSet(FOG_KEY, JSON.stringify(Array.from(f))) // zapisz tylko przy nowym terenie
+  }
+
   function drawMap() {
     if (!mapCv) return
     var ctx = mapCv.getContext('2d')
     var W = mapCv.width, H = mapCv.height
     var E = mapEntities()
     var cx = E.me ? E.me.x : 0, cz = E.me ? E.me.z : 0
-    // stała skala (jak minimapa): promień 70 kroków, stabilny obraz
+    if (E.me) markFog(cx, cz)
     var r = 70
     var sc = (Math.min(W, H) / 2 - 20) / r
     function px(x) { return W / 2 + (x - cx) * sc }
     function pz(z) { return H / 2 - (z - cz) * sc } // oś Z odwrócona: północ = -Z
-    // punkt doczepiony do krawędzi, gdy poza zasięgiem mapy
     function clampPt(p) {
       var dx = (p.x - cx) * sc, dz = -(p.z - cz) * sc
       var d = Math.sqrt(dx * dx + dz * dz), lim = Math.min(W, H) / 2 - 14
@@ -505,21 +523,44 @@
     }
 
     ctx.clearRect(0, 0, W, H)
+    // kamieniste tło
     var grad = ctx.createRadialGradient(W / 2, H / 2, 20, W / 2, H / 2, W / 2)
-    grad.addColorStop(0, '#171029')
-    grad.addColorStop(1, '#0a0612')
+    grad.addColorStop(0, '#221e1a')
+    grad.addColorStop(1, '#12100d')
     ctx.fillStyle = grad
     ctx.fillRect(0, 0, W, H)
     ctx.save()
     ctx.beginPath(); ctx.arc(W / 2, H / 2, Math.min(W, H) / 2 - 12, 0, 7); ctx.clip()
-    ctx.strokeStyle = 'rgba(168,85,247,.12)'
+    // odkryty teren: kamienna siatka
+    ctx.strokeStyle = 'rgba(168,157,134,.16)'
     ctx.lineWidth = 1
-    for (var g10 = -r; g10 <= r; g10 += 10) {
-      ctx.beginPath(); ctx.moveTo(px(cx + g10), 0); ctx.lineTo(px(cx + g10), H); ctx.stroke()
-      ctx.beginPath(); ctx.moveTo(0, pz(cz + g10)); ctx.lineTo(W, pz(cz + g10)); ctx.stroke()
+    var cell = FOG_STEP * sc
+    for (var g10 = -r; g10 <= r; g10 += FOG_STEP) {
+      var lx = px(cx + g10), lz = pz(cz + g10)
+      if (visited(cx + g10 + FOG_STEP / 2, cz + g10 + FOG_STEP / 2)) {
+        ctx.beginPath(); ctx.moveTo(lx, 0); ctx.lineTo(lx, H); ctx.stroke()
+        ctx.beginPath(); ctx.moveTo(0, lz); ctx.lineTo(W, lz); ctx.stroke()
+      }
     }
-    // łupy
+    // nieodkryty teren: ciemne kamieniste płyty
+    var ix0 = Math.floor((cx - r) / FOG_STEP), ix1 = Math.ceil((cx + r) / FOG_STEP)
+    var iz0 = Math.floor((cz - r) / FOG_STEP), iz1 = Math.ceil((cz + r) / FOG_STEP)
+    for (var fx = ix0; fx <= ix1; fx++) for (var fz = iz0; fz <= iz1; fz++) {
+      if (loadFog().has(cellKey(fx, fz))) continue
+      var wx = px(fx * FOG_STEP), wz = pz(fz * FOG_STEP)
+      // deterministyczny odcień — wygląda jak nierówny kamień
+      var h = (fx * 73856093 ^ fz * 19349663) >>> 0
+      var shade = 10 + (h % 7)
+      ctx.fillStyle = 'rgb(' + shade + ',' + (shade - 2) + ',' + (shade - 4) + ')'
+      ctx.fillRect(wx, wz, cell + 1, cell + 1)
+      if (h % 3 === 0) { // rysa w skale
+        ctx.strokeStyle = 'rgba(0,0,0,.4)'
+        ctx.beginPath(); ctx.moveTo(wx + 2, wz + 3); ctx.lineTo(wx + cell - 2, wz + cell - 3); ctx.stroke()
+      }
+    }
+    // łupy — tylko na odkrytym terenie
     E.loot.forEach(function (l) {
+      if (!visited(l.x, l.z)) return
       var pt = clampPt(l)
       ctx.globalAlpha = pt.edge ? .45 : 1
       ctx.fillStyle = RAR[l.rarity] || '#d6d3d1'
@@ -529,6 +570,7 @@
     })
     // wrogowie
     E.foes.forEach(function (f) {
+      if (!visited(f.x, f.z)) return
       var pt = clampPt(f)
       ctx.globalAlpha = pt.edge ? .45 : 1
       ctx.fillStyle = f.elite ? '#dc2626' : '#ef4444'
@@ -536,6 +578,7 @@
     })
     // NPC
     E.npcs.forEach(function (n) {
+      if (!visited(n.x, n.z)) return
       var pt = clampPt(n)
       ctx.globalAlpha = pt.edge ? .45 : 1
       ctx.fillStyle = '#fbbf24'
@@ -549,7 +592,7 @@
     })
     ctx.restore()
     ctx.globalAlpha = 1
-    // gracz — strzałka zwrócona w kierunku patrzenia (forward = (sin yaw, 0, cos yaw))
+    // gracz — strzałka zwrócona w kierunku patrzenia
     if (E.me) {
       var mx = px(E.me.x), mz = pz(E.me.z)
       ctx.save()
@@ -563,7 +606,7 @@
       ctx.restore()
     }
     // skala
-    ctx.fillStyle = '#52525b'
+    ctx.fillStyle = '#78716c'
     ctx.font = '10px Georgia'
     ctx.textAlign = 'left'
     ctx.fillRect(16, H - 22, 10 * sc, 3)
