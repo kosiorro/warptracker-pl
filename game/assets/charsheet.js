@@ -172,13 +172,13 @@
       const real = !!REAL[d.key]
       const it = real ? L.equipped[d.key] : null
       if (it) {
-        doll += '<div class="cs-slot" data-slot="' + d.key + '" style="' + d.pos + '" data-wtitem="' + attrJSON(it) + '">' +
+        doll += '<div class="cs-slot" data-slot="' + d.key + '" style="' + d.pos + '" data-wtitem="' + attrJSON(it) + '" draggable="true">' +
           itemIcon(it) + '<span class="nm" style="color:' + RAR[it.rarity] + '">' + esc(it.name) + '</span></div>'
       } else if (real) {
         doll += '<div class="cs-slot" data-slot="' + d.key + '" style="' + d.pos + '" title="' + d.label + ' — pusto">' +
           ICONS[d.icon]('#8b8b8b') + '<span class="lbl">' + d.label + '</span></div>'
       } else {
-        doll += '<div class="cs-slot locked" style="' + d.pos + '" title="' + d.label + ' — ten typ wyposażenia nie jest używany w Warptracker PL">' +
+        doll += '<div class="cs-slot locked" style="' + d.pos + '" title="' + d.label + ' — ten typ wyposażenia nie jest używany w Wyrworze">' +
           ICONS[d.icon]('#4a4453') + '<span class="lock">🔒 ' + d.label + '</span></div>'
       }
     }
@@ -188,7 +188,7 @@
     for (let i = 0; i < MAX_INV; i++) {
       const it = inv[i]
       if (it) {
-        grid += '<div class="inv-cell" data-idx="' + i + '" data-rare="' + (it.rarity === 'rare') + '" data-uniq="' + (it.rarity === 'unique') + '" data-wtitem="' + attrJSON(it) + '">' + itemIcon(it) + '</div>'
+        grid += '<div class="inv-cell" data-idx="' + i + '" data-rare="' + (it.rarity === 'rare') + '" data-uniq="' + (it.rarity === 'unique') + '" data-wtitem="' + attrJSON(it) + '" draggable="true">' + itemIcon(it) + '</div>'
       } else {
         grid += '<div class="inv-cell empty"></div>'
       }
@@ -199,7 +199,7 @@
       '<div class="cs-col"><div class="cs-title">KARTA POSTACI</div><div class="cs-sub">poziom ' + (hero ? (hero.level || '?') : '?') + '</div>' + doll + '</div>' +
       '<div class="cs-col"><div class="cs-title">SAKWA</div><div class="cs-sub">plecak tropiciela</div><div class="inv-grid">' + grid + '</div><div class="cs-count">' + inv.length + ' / ' + MAX_INV + '</div>' +
       '<div class="cs-gold">🪙 ' + goldStr() + '</div>' +
-      '<div class="cs-hint">LPM — załóż / zdejmij &middot; PPM — wyrzuć<br/>C lub I — otwórz / zamknij &middot; ESC — zamknij</div></div>' +
+      '<div class="cs-hint">LPM lub przeciągnij — załóż / zdejmij &middot; PPM — wyrzuć<br/>C lub I — otwórz / zamknij &middot; ESC — zamknij</div></div>' +
       '</div>'
   }
 
@@ -244,6 +244,33 @@
   root.addEventListener('contextmenu', (e) => {
     const cell = e.target.closest('.inv-cell[data-idx]')
     if (cell) { e.preventDefault(); discard(Number(cell.dataset.idx)) }
+  })
+
+  // ---- DRAG & DROP: przeciągnij przedmiot między sakwą a slotami lalki ----
+  root.addEventListener('dragstart', (e) => {
+    const cell = e.target.closest('.inv-cell[data-idx]')
+    if (cell) { e.dataTransfer.setData('text/plain', 'inv:' + cell.dataset.idx); e.dataTransfer.effectAllowed = 'move'; return }
+    const slot = e.target.closest('.cs-slot[data-slot]')
+    if (slot) { e.dataTransfer.setData('text/plain', 'slot:' + slot.dataset.slot); e.dataTransfer.effectAllowed = 'move' }
+  })
+  root.addEventListener('dragover', (e) => {
+    const t = e.target.closest('.cs-slot[data-slot], .inv-grid')
+    if (t && !t.classList.contains('locked')) e.preventDefault()
+  })
+  root.addEventListener('drop', (e) => {
+    e.preventDefault()
+    const data = e.dataTransfer.getData('text/plain') || ''
+    const [kind, id] = data.split(':')
+    const slotEl = e.target.closest('.cs-slot[data-slot]')
+    const gridEl = e.target.closest('.inv-grid')
+    if (kind === 'inv' && slotEl) {
+      const inv = loadInv()
+      const it = inv[Number(id)]
+      if (it && it.slot === slotEl.dataset.slot) equip(Number(id))
+      else if (it) alert('To nie pasuje do slotu „' + (SLOT_PL[it.slot] || it.slot) + '”. Ten przedmiot zakłada się w slocie: ' + (SLOT_PL[it.slot] || it.slot) + '.')
+    } else if (kind === 'slot' && gridEl) {
+      unequip(id)
+    }
   })
 
   function toggle(force) {

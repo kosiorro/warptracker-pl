@@ -222,7 +222,7 @@
     var h = '<div class="m-box">'
     if (menuView === 'main') {
       var mute = lsGet('wt.mute', '0') === '1'
-      h += '<div class="m-logo">WARPTRACKER</div>' +
+      h += '<div class="m-logo">WYRWOR</div>' +
         '<div class="m-sub">poziom ' + inf.lvl + ' · rozdział ' + inf.ch + '</div>' +
         '<button class="m-btn" data-act="resume">▶ Wróć do gry</button>' +
         '<button class="m-btn" data-act="charsheet">Karta postaci</button>' +
@@ -422,7 +422,7 @@
     var d = document.getElementById('npc-dialogue')
     if (!d) return
     var btn = d.querySelector('.wt-shop-btn')
-    if (!btn && d.offsetParent !== null) {
+    if (!btn && d.classList.contains('show')) {
       btn = document.createElement('button')
       btn.className = 'wt-shop-btn'
       btn.textContent = '🛒 Handel'
@@ -432,14 +432,159 @@
   }, 700)
 
   // ============================================================
-  // KLAWISZE: ESC — menu (gdy karta postaci / sklep zamknięte)
+  // MAPA (TAB) — schematyczna mapa terenu: Ty, NPC, wrogowie, łupy
+  // ============================================================
+  var mapEl = null, mapCv = null, mapTimer = null
+
+  function ensureMap() {
+    if (mapEl) return mapEl
+    var st = document.createElement('style')
+    st.textContent =
+      '#wt-map{position:fixed;inset:0;z-index:180;display:none;align-items:center;justify-content:center;background:rgba(5,2,8,.82);backdrop-filter:blur(2px);font-family:Georgia,serif}' +
+      '#wt-map.show{display:flex}' +
+      '#wt-map .mp-box{display:flex;flex-direction:column;align-items:center;gap:10px}' +
+      '#wt-map .mp-title{color:#e9d5ff;letter-spacing:.34em;font-size:20px;text-shadow:0 0 18px #6b21a8}' +
+      '#wt-map canvas{background:#0d0815;border:1px solid #6b21a8;border-radius:10px;box-shadow:0 0 40px rgba(168,85,247,.3)}' +
+      '#wt-map .mp-legend{color:#a1a1aa;font-size:12px;letter-spacing:.08em;display:flex;gap:18px}' +
+      '#wt-map .mp-legend b{font-weight:normal}' +
+      '#wt-map .mp-hint{color:#52525b;font-size:11px;letter-spacing:.14em}'
+    document.head.appendChild(st)
+    mapEl = document.createElement('div')
+    mapEl.id = 'wt-map'
+    mapEl.innerHTML = '<div class="mp-box"><div class="mp-title">MAPA ŻAROWARTY</div><canvas width="560" height="560"></canvas>' +
+      '<div class="mp-legend"><b style="color:#c084fc">◆ Ty</b><b style="color:#fbbf24">● NPC</b><b style="color:#ef4444">● wrogowie</b><b style="color:#d6d3d1">♦ łupy</b></div>' +
+      '<div class="mp-hint">TAB — zamknij mapę</div></div>'
+    document.body.appendChild(mapEl)
+    mapCv = mapEl.querySelector('canvas')
+    return mapEl
+  }
+
+  function mapEntities() {
+    var g = window.__WT
+    var out = { me: null, npcs: [], foes: [], loot: [] }
+    if (!g) return out
+    try { if (g.hero && g.hero.position) out.me = { x: g.hero.position.x, z: g.hero.position.z, yaw: (g.hero.rotation ? g.hero.rotation.y : null) } } catch (e) {}
+    try {
+      var ns = g.npcs && g.npcs.npcs
+      if (Array.isArray(ns)) ns.forEach(function (n) {
+        if (n && n.group && n.group.position) out.npcs.push({ x: n.group.position.x, z: n.group.position.z, id: n.def && n.def.id })
+      })
+    } catch (e) {}
+    try {
+      if (Array.isArray(g.enemies)) g.enemies.forEach(function (en) {
+        if (en && !en.removed && en.group && en.group.position) out.foes.push({ x: en.group.position.x, z: en.group.position.z, elite: !!(en.kind && en.kind.elite) })
+      })
+    } catch (e) {}
+    try {
+      var L = g.loot
+      if (L && Array.isArray(L.drops)) L.drops.forEach(function (dr) {
+        if (dr && dr.group && dr.group.position && dr.item) out.loot.push({ x: dr.group.position.x, z: dr.group.position.z, rarity: dr.item.rarity })
+      })
+    } catch (e) {}
+    return out
+  }
+
+  function drawMap() {
+    if (!mapCv) return
+    var ctx = mapCv.getContext('2d')
+    var W = mapCv.width, H = mapCv.height
+    var E = mapEntities()
+    // zakres: dopasuj do istot, min. promień 35 wokół gracza
+    var cx = E.me ? E.me.x : 0, cz = E.me ? E.me.z : 0
+    var r = 35
+    var all = [{ x: cx, z: cz }].concat(E.npcs, E.foes, E.loot)
+    all.forEach(function (p) {
+      r = Math.max(r, Math.abs(p.x - cx), Math.abs(p.z - cz))
+    })
+    r = Math.min(r + 8, 400)
+    var sc = (Math.min(W, H) / 2 - 24) / r
+    function px(x) { return W / 2 + (x - cx) * sc }
+    function pz(z) { return H / 2 - (z - cz) * sc } // oś Z odwrócona: północ = -Z
+
+    ctx.clearRect(0, 0, W, H)
+    // tło: mgła + siatka
+    var grad = ctx.createRadialGradient(W / 2, H / 2, 20, W / 2, H / 2, W / 2)
+    grad.addColorStop(0, '#171029')
+    grad.addColorStop(1, '#0a0612')
+    ctx.fillStyle = grad
+    ctx.fillRect(0, 0, W, H)
+    ctx.strokeStyle = 'rgba(168,85,247,.12)'
+    ctx.lineWidth = 1
+    for (var gx = -r; gx <= r; gx += 20) {
+      ctx.beginPath(); ctx.moveTo(px(cx + gx), 0); ctx.lineTo(px(cx + gx), H); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(0, pz(cz + gx)); ctx.lineTo(W, pz(cz + gx)); ctx.stroke()
+    }
+    // łupy
+    E.loot.forEach(function (l) {
+      ctx.fillStyle = RAR[l.rarity] || '#d6d3d1'
+      ctx.beginPath()
+      ctx.moveTo(px(l.x), pz(l.z) - 5); ctx.lineTo(px(l.x) + 5, pz(l.z)); ctx.lineTo(px(l.x), pz(l.z) + 5); ctx.lineTo(px(l.x) - 5, pz(l.z))
+      ctx.closePath(); ctx.fill()
+    })
+    // wrogowie
+    E.foes.forEach(function (f) {
+      ctx.fillStyle = f.elite ? '#dc2626' : '#ef4444'
+      ctx.beginPath(); ctx.arc(px(f.x), pz(f.z), f.elite ? 4.5 : 3, 0, 7); ctx.fill()
+    })
+    // NPC
+    ctx.fillStyle = '#fbbf24'
+    E.npcs.forEach(function (n) {
+      ctx.beginPath(); ctx.arc(px(n.x), pz(n.z), 4, 0, 7); ctx.fill()
+      if (n.id) {
+        ctx.fillStyle = '#a16207'
+        ctx.font = '10px Georgia'
+        ctx.textAlign = 'center'
+        ctx.fillText(n.id, px(n.x), pz(n.z) - 7)
+      }
+    })
+    // gracz
+    if (E.me) {
+      var mx = px(E.me.x), mz = pz(E.me.z)
+      ctx.save()
+      ctx.translate(mx, mz)
+      if (E.me.yaw !== null && !isNaN(E.me.yaw)) ctx.rotate(-E.me.yaw)
+      ctx.fillStyle = '#c084fc'
+      ctx.shadowColor = '#a855f7'; ctx.shadowBlur = 14
+      ctx.beginPath()
+      ctx.moveTo(0, -10); ctx.lineTo(7, 8); ctx.lineTo(0, 4); ctx.lineTo(-7, 8)
+      ctx.closePath(); ctx.fill()
+      ctx.restore()
+    }
+    // skala
+    ctx.fillStyle = '#52525b'
+    ctx.font = '10px Georgia'
+    ctx.textAlign = 'left'
+    var bar = 20 * sc
+    ctx.fillRect(16, H - 22, bar, 3)
+    ctx.fillText('20 kroków', 16, H - 27)
+  }
+
+  function mapOpen() { return !!(mapEl && mapEl.classList.contains('show')) }
+  function toggleMap(force) {
+    ensureMap()
+    var v = typeof force === 'boolean' ? force : !mapOpen()
+    mapEl.classList.toggle('show', v)
+    if (v) {
+      drawMap()
+      mapTimer = setInterval(drawMap, 150)
+    } else if (mapTimer) { clearInterval(mapTimer); mapTimer = null }
+  }
+
+  // ============================================================
+  // KLAWISZE: ESC — menu, TAB — mapa
   // ============================================================
   window.addEventListener('keydown', function (e) {
+    if (e.key === 'Tab') {
+      e.preventDefault()
+      if (!e.repeat) toggleMap()
+      return
+    }
     if (e.key !== 'Escape' || e.repeat) return
     if (quickPanelOpen()) return
     if (window.__wtCS && window.__wtCS.isOpen && window.__wtCS.isOpen()) return // karta postaci sama się zamknie
     if (shop && shop.classList.contains('show')) { e.preventDefault(); shop.classList.remove('show'); return }
     if (window.__wtShopBlocked) return
+    if (mapOpen()) { e.preventDefault(); toggleMap(false); return }
     e.preventDefault()
     if (menuOpen()) closeMenu()
     else openMenu()

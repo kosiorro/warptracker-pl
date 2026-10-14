@@ -1,6 +1,6 @@
-# Warptracker PL 🇵🇱
+# Wyrwor PL 🇵🇱
 
-Polska edycja [Warptrackera](https://github.com/ilrein/warptracker) — open source'owego ARPG w stylu Diablo, które działa w przeglądarce (Three.js, MIT).
+Polska edycja [Warptrackera](https://github.com/ilrein/warptracker) (nasza nazwa: **Wyrwor**) — open source'owego ARPG w stylu Diablo, które działa w przeglądarce (Three.js, MIT).
 
 Jesteś Tropicielem. Wyrwy — strumienie zła — rozdzierają świat. Wybierz Zakon, weź łowy przy ogniu Żarowarty i zejdź na Czarne Bagna. Rozbij iglice, zapieczętuj wyrwy, zejdź do Pustego Kurhanu i rozbij Serce Wyrwy.
 

@@ -1,4 +1,4 @@
-Warptracker PL — instrukcja uruchomienia
+Wyrwor PL (dawniej Warptracker PL) — instrukcja uruchomienia
 =========================================
 
 1. Sklonuj lub pobierz to repozytorium.
