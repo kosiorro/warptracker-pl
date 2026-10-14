@@ -853,9 +853,111 @@
     bFlag.position.set(TOWN.x - 7.2, 3.7, TOWN.z - 11.6)
     root.add(bFlag)
 
+    // ---- v15: rozbudowa według wizji (nocna osada z ołtarzem, namiotami, kaplicą) ----
+    var tentGreen = new THREE.MeshStandardMaterial({ color: 0x2f4a2c, roughness: 1 })
+    var tentRed = new THREE.MeshStandardMaterial({ color: 0x5c2626, roughness: 1 })
+    var clothM = new THREE.MeshStandardMaterial({ color: 0x1c1610, roughness: 1 })
+    var leafM = new THREE.MeshStandardMaterial({ color: 0x24371f, roughness: 1 })
+    var leafDark = new THREE.MeshStandardMaterial({ color: 0x1a2a18, roughness: 1 })
+    var runeM = new THREE.MeshBasicMaterial({ color: 0xa855f7 })
+    var purpleFlameM = new THREE.MeshBasicMaterial({ color: 0x9333ea, transparent: true, opacity: 0.9 })
+    var stoneNew = new THREE.MeshStandardMaterial({ color: 0x56514a, roughness: 1 })
+
+    // pochodnie między istniejącymi (8 → 14), światło punktowe tylko na 2 nowych (limit świateł w forward renderingu)
+    var newTorchAngles = [Math.PI / 8, 3 * Math.PI / 8, 5 * Math.PI / 8, 7 * Math.PI / 8, 11 * Math.PI / 8, 15 * Math.PI / 8]
+    newTorchAngles.forEach(function (ta, idx) {
+      buildTorch(Math.cos(ta) * 9.4, Math.sin(ta) * 9.4, idx === 0 || idx === 3)
+    })
+
+    // ołtarz z runami: kamienna baza, 3 płyty, świecący kryształ + fioletowy płomień
+    var altar = new THREE.Group()
+    var aBase = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.3, 0.5, 8), stoneNew)
+    aBase.position.y = 0.25; altar.add(aBase)
+    var aTop = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.95, 0.35, 8), stoneDark)
+    aTop.position.y = 0.6; altar.add(aTop)
+    for (var ri = 0; ri < 3; ri++) {
+      var ra = ri * Math.PI * 2 / 3
+      var slab = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.6, 0.28), stoneNew)
+      slab.position.set(Math.cos(ra) * 1.5, 0.8, Math.sin(ra) * 1.5)
+      slab.rotation.y = -ra + Math.PI / 2
+      altar.add(slab)
+    }
+    var crystal = new THREE.Mesh(new THREE.OctahedronGeometry(0.34, 0), runeM)
+    crystal.position.y = 1.35; altar.add(crystal)
+    var purpleFl = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.5, 6), purpleFlameM)
+    purpleFl.position.y = 1.85; altar.add(purpleFl)
+    fireFlames.push(purpleFl)
+    var aLight = new THREE.PointLight(0x8b5cf6, 3.5, 8, 2)
+    aLight.position.y = 1.7; altar.add(aLight)
+    fireLights.push({ light: aLight, base: 3.5 })
+    altar.position.set(TOWN.x - 5.5, 0, TOWN.z + 0.5)
+    root.add(altar)
+
+    // dwa namioty (zielony i czerwony) z ciemnym wejściem
+    function buildTent(dx, dz, rot, mat) {
+      var t = new THREE.Group()
+      var cone = new THREE.Mesh(new THREE.ConeGeometry(1.7, 1.9, 5), mat)
+      cone.position.y = 0.95; cone.rotation.y = rot; t.add(cone)
+      var gap = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 1.2), clothM)
+      gap.position.set(0, 0.6, -1.42); gap.rotation.y = Math.PI; t.add(gap)
+      t.position.set(TOWN.x + dx, 0, TOWN.z + dz)
+      root.add(t)
+    }
+    buildTent(1.5, 8.4, 0.3, tentGreen)
+    buildTent(-6.8, -7.0, 2.2, tentRed)
+
+    // drewniana kapliczka z krzyżem (jak w wizji: budynek z krzyżem po lewej)
+    var chapel = new THREE.Group()
+    var cWall = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2.6, 3.4), wood)
+    cWall.position.y = 1.3; chapel.add(cWall)
+    var cRoof = new THREE.Mesh(new THREE.ConeGeometry(2.3, 1.8, 4), thatch)
+    cRoof.position.y = 3.4; cRoof.rotation.y = Math.PI / 4; chapel.add(cRoof)
+    var cCrossV = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.85, 0.09), woodDark)
+    cCrossV.position.y = 4.5; chapel.add(cCrossV)
+    var cCrossH = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.09, 0.09), woodDark)
+    cCrossH.position.y = 4.65; chapel.add(cCrossH)
+    chapel.position.set(TOWN.x + 11.2, 0, TOWN.z - 7.2)
+    root.add(chapel)
+
+    // beczki, stół, ławy przy ognisku
+    [[-2.2, 2.6], [-2.9, 2.0], [2.8, -2.4]].forEach(function (bp) {
+      var b = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.7, 9), woodDark)
+      b.position.set(TOWN.x + bp[0], 0.35, TOWN.z + bp[1])
+      b.rotation.y = bp[0]
+      root.add(b)
+    })
+    var table = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.09, 0.9), wood)
+    table.position.set(TOWN.x + 3.1, 0.62, TOWN.z + 1.9)
+    root.add(table)
+    ;[[2.4, 1.9], [3.8, 1.9]].forEach(function (lp) {
+      var legb = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.6, 0.09), woodDark)
+      legb.position.set(TOWN.x + lp[0], 0.3, TOWN.z + lp[1])
+      root.add(legb)
+    })
+    ;[[2.2, 2.8], [4.0, 2.8]].forEach(function (bench) {
+      var bn = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.08, 0.35), wood)
+      bn.position.set(TOWN.x + bench[0], 0.3, TOWN.z + bench[1])
+      root.add(bn)
+    })
+
+    // drzewa i krzewy na obrzeżach obozu
+    [[12.4, 3.2, 1], [-11.6, -4.4, 1.2], [-2.0, 12.6, 0.9], [10.2, 11.0, 1.1], [-12.2, 7.0, 1], [4.6, -12.4, 0.8]].forEach(function (tp) {
+      var tr = new THREE.Group()
+      var trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.2, 1.6, 5), woodDark)
+      trunk.position.y = 0.8; tr.add(trunk)
+      var crown1 = new THREE.Mesh(new THREE.ConeGeometry(1.1, 2.6, 6), leafM)
+      crown1.position.y = 2.6; tr.add(crown1)
+      var crown2 = new THREE.Mesh(new THREE.ConeGeometry(0.8, 1.9, 6), leafDark)
+      crown2.position.y = 3.5; tr.add(crown2)
+      tr.position.set(TOWN.x + tp[0], 0, TOWN.z + tp[1])
+      tr.scale.setScalar(tp[2])
+      tr.rotation.y = tp[0]
+      root.add(tr)
+    })
+
     scene.add(root)
     townDone = true
-    console.log('[wt] Osada Żarowarta rozbudowana ✓ (plac, 6 domów, 8 pochodni, wieża, wóz)')
+    console.log('[wt] Osada Żarowarta rozbudowana ✓ v15 (plac, 6 domów, 14 pochodni, wieża, wóz, ołtarz runiczny, 2 namioty, kapliczka, drzewa)')
 
     // ---- OPT: scal statyczne meshe osady według materiału (~95 → ~20 draw calls) ----
     // pochodnie-płomienie zostają osobno (migoczą), światła punktowe zostają.
@@ -1165,6 +1267,24 @@
       } catch (e) {}
     }
     setTimeout(warmDom, 6500)
+
+    // 6) NOCNY NASTRÓJ (jak na wizji osady): głębsza mgła, przygaszone światło nieba
+    //    i niżej ekspozycja — pochodnie i ołtarz robią wtedy plamy światła w mroku.
+    //    ustawienie wt.night: '0' przywraca oryginalne wartości po F5
+    try {
+      if (lsGet('wt.night', '1') !== '0' && g.scene) {
+        var sc = g.scene
+        if (sc.fog && sc.fog.density !== undefined && !sc.__wtNight) { sc.fog.density = Math.min(sc.fog.density * 1.6, 0.035); sc.__wtNight = true }
+        sc.traverse(function (o) {
+          try {
+            if (o.isHemisphereLight && !o.__wtNight) { o.intensity *= 0.55; o.__wtNight = true }
+            else if (o.isDirectionalLight && o.intensity > 1.5 && !o.__wtNight) { o.intensity *= 0.8; o.__wtNight = true }
+          } catch (e) {}
+        })
+        if (renderer.toneMappingExposure && !renderer.__wtNight) { renderer.toneMappingExposure *= 0.88; renderer.__wtNight = true }
+        console.log('[wt] nocny nastrój włączony (wt.night=0 wyłącza)')
+      }
+    } catch (e) {}
 
     // 3) guard pętli: wyjątek w renderze nie może zabić pętli animacji (czarny ekran / zawieszenie)
     var lastFrameAt = Date.now(), loopErrors = {}
