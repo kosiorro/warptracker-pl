@@ -202,11 +202,13 @@
     }
     var inf = heroInfo()
     lsSet(slotKey(n), JSON.stringify({ t: Date.now(), lvl: inf.lvl, ch: inf.ch, data: data }))
+    sfx('save')
   }
   function loadSlot(n) {
     var s = lsJSON(slotKey(n), null)
     if (!s || !s.data) return false
     for (var k in s.data) lsSet(k, s.data[k])
+    sfx('load')
     return true
   }
   function slotMeta(n) { return lsJSON(slotKey(n), null) }
@@ -401,6 +403,7 @@
         if (gold() < p) { alert('Za mało złota! Potrzebujesz 🪙 ' + p) ; return }
         if (window.__wtInvAdd && window.__wtInvAdd(JSON.parse(JSON.stringify(it)))) {
           setGold(gold() - p)
+          sfx('buy')
           renderShop()
         } else alert('Sakwa pełna!')
       } else if (act === 'sell') {
@@ -413,6 +416,7 @@
         inv.splice(i, 1)
         lsSet('wt.inv', JSON.stringify(inv))
         setGold(gold() + p2)
+        sfx('sell')
         renderShop()
       }
     })
@@ -894,6 +898,197 @@
   var townTimer = setInterval(function () {
     if (buildTown() || ++townTries > 600) clearInterval(townTimer)
   }, 250)
+
+  // ============================================================
+  // AUDIO: Howler (CDN) + własne sample (assets/sfx/*.wav), fallback: WebAudio drone
+  // ============================================================
+  var HowlerRef = null, ambientHowl = null, sfxCache = {}, droneGain = null
+  function muted() { return lsGet('wt.mute', '0') === '1' }
+
+  function startDrone() {
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext
+      var ac = new AC()
+      droneGain = ac.createGain()
+      droneGain.gain.value = muted() ? 0 : 0.05
+      droneGain.connect(ac.destination)
+      ;[55, 58.27, 110, 164.81].forEach(function (f, i) {
+        var o = ac.createOscillator()
+        o.type = i < 2 ? 'sine' : 'triangle'
+        o.frequency.value = f
+        var g = ac.createGain()
+        g.gain.value = i < 2 ? 0.5 : 0.12
+        o.connect(g); g.connect(droneGain); o.start()
+      })
+    } catch (e) {}
+  }
+
+  function initAudio() {
+    if (window.__wtAudioTried) return
+    window.__wtAudioTried = true
+    var pHowler = new Promise(function (res) {
+      var s = document.createElement('script')
+      s.src = 'https://cdn.jsdelivr.net/npm/howler@2.2.4/dist/howler.min.js'
+      s.onload = res
+      s.onerror = res
+      document.head.appendChild(s)
+    })
+    var pSfx = Promise.resolve()
+    try {
+      pSfx = import(new URL('sfx.js', import.meta.url).href).catch(function () {})
+    } catch (e) {}
+    Promise.all([pHowler, pSfx]).then(function () {
+      var b64 = window.__wtSfxB64 || {}
+      var uri = function (n) { return (b64[n] ? 'data:audio/wav;base64,' + b64[n] : 'assets/sfx/' + n + '.wav') }
+      if (window.Howler && window.Howl) {
+        HowlerRef = window.Howler
+        HowlerRef.mute(muted())
+        ambientHowl = new window.Howl({ src: [uri('ambient')], loop: true, volume: 0.4 })
+        ambientHowl.play()
+      } else {
+        console.log('[wt] Howler niedostępny (offline?) — włączam wbudowany dron WebAudio')
+        startDrone()
+      }
+      setInterval(function () {
+        var m = muted()
+        if (HowlerRef) HowlerRef.mute(m)
+        if (droneGain) droneGain.gain.value = m ? 0 : 0.05
+      }, 1000)
+    })
+  }
+  window.addEventListener('pointerdown', function once() { initAudio() }, { once: true })
+
+  function sfx(name) {
+    try {
+      if (!window.Howl || muted()) return
+      if (!sfxCache[name]) {
+        var b64 = window.__wtSfxB64 || {}
+        var src = b64[name] ? 'data:audio/wav;base64,' + b64[name] : 'assets/sfx/' + name + '.wav'
+        sfxCache[name] = new window.Howl({ src: [src], volume: 0.5 })
+      }
+      sfxCache[name].play()
+    } catch (e) {}
+  }
+
+  // ============================================================
+  // POST FX: bloom + vignette + flash obrażeń (własny pipeline na THREE z bundle)
+  // (wersja CDN pmndrs wymagałaby drugiej kopii three.js → konflikt instancji)
+  // ============================================================
+  var FX_VS = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }'
+  var FX_BRIGHT = 'varying vec2 vUv; uniform sampler2D tDiffuse; uniform float threshold; void main(){ vec3 c = texture2D(tDiffuse, vUv).rgb; float l = dot(c, vec3(0.299,0.587,0.114)); float f = smoothstep(threshold, threshold + 0.35, l); gl_FragColor = vec4(c * f, 1.0); }'
+  var FX_BLUR = 'varying vec2 vUv; uniform sampler2D tDiffuse; uniform vec2 dir; uniform vec2 texel; void main(){ vec3 s = texture2D(tDiffuse, vUv).rgb * 0.227; for (int i = 1; i < 5; i++) { vec2 o = dir * texel * float(i); float w = (i==1) ? 0.194 : (i==2) ? 0.121 : (i==3) ? 0.054 : 0.016; s += texture2D(tDiffuse, vUv + o).rgb * w; s += texture2D(tDiffuse, vUv - o).rgb * w; } gl_FragColor = vec4(s, 1.0); }'
+  var FX_FINAL = 'varying vec2 vUv; uniform sampler2D tScene; uniform sampler2D tBloom; uniform float flash; void main(){ vec3 c = texture2D(tScene, vUv).rgb + texture2D(tBloom, vUv).rgb * 0.85; vec2 d = vUv - 0.5; float vig = 1.0 - dot(d, d) * 0.9; c *= clamp(vig, 0.0, 1.0); c = mix(c, vec3(0.55, 0.02, 0.02), flash * 0.3); gl_FragColor = vec4(c, 1.0); }'
+
+  var wtFrames = 0 // licznik klatek do panelu debug
+
+  function tryHookRender() {
+    var dbg = window.__WTdebug, g = window.__WT
+    if (!dbg || !dbg.THREE || !g || !g.renderer) return false
+    var renderer = g.renderer
+    if (renderer.__wtHooked) return true
+    var T = dbg.THREE
+    var origRender = renderer.render.bind(renderer)
+    var fxOk = false, fxState = null
+
+    try {
+      var sz = renderer.getSize(new T.Vector2())
+      var w = Math.max(2, sz.x), h = Math.max(2, sz.y)
+      var rtOpts = { minFilter: T.LinearFilter, magFilter: T.LinearFilter }
+      var sceneRT = new T.WebGLRenderTarget(w, h, rtOpts)
+      var bw = Math.max(2, w >> 1), bh = Math.max(2, h >> 1)
+      var rtA = new T.WebGLRenderTarget(bw, bh, rtOpts)
+      var rtB = new T.WebGLRenderTarget(bw, bh, rtOpts)
+      var quadCam = new T.OrthographicCamera(-1, 1, 1, -1, 0, 1)
+      var quadScene = new T.Scene()
+      var quad = new T.Mesh(new T.PlaneGeometry(2, 2))
+      quadScene.add(quad)
+      var brightMat = new T.ShaderMaterial({ uniforms: { tDiffuse: { value: null }, threshold: { value: 0.72 } }, vertexShader: FX_VS, fragmentShader: FX_BRIGHT, depthTest: false, depthWrite: false })
+      var blurMat = new T.ShaderMaterial({ uniforms: { tDiffuse: { value: null }, dir: { value: new T.Vector2(1, 0) }, texel: { value: new T.Vector2(1 / bw, 1 / bh) } }, vertexShader: FX_VS, fragmentShader: FX_BLUR, depthTest: false, depthWrite: false })
+      var finalMat = new T.ShaderMaterial({ uniforms: { tScene: { value: null }, tBloom: { value: null }, flash: { value: 0 } }, vertexShader: FX_VS, fragmentShader: FX_FINAL, depthTest: false, depthWrite: false })
+      var flash = 0, lastHp = null
+      fxState = { sceneRT: sceneRT, rtA: rtA, rtB: rtB, quad: quad, quadScene: quadScene, quadCam: quadCam, brightMat: brightMat, blurMat: blurMat, finalMat: finalMat }
+      window.addEventListener('resize', function () {
+        try {
+          var s2 = renderer.getSize(new T.Vector2())
+          sceneRT.setSize(s2.x, s2.y)
+          var b2w = Math.max(2, s2.x >> 1), b2h = Math.max(2, s2.y >> 1)
+          rtA.setSize(b2w, b2h); rtB.setSize(b2w, b2h)
+          blurMat.uniforms.texel.value.set(1 / b2w, 1 / b2h)
+        } catch (e) {}
+      })
+      fxOk = true
+      console.log('[wt] post-fx aktywny: bloom + vignette + flash obrażeń')
+    } catch (e) {
+      console.warn('[wt] post-fx niedostępny (działa bez efektów):', e)
+    }
+
+    renderer.render = function (scene, camera) {
+      wtFrames++
+      if (!fxOk) { origRender(scene, camera); return }
+      try {
+        var S = fxState
+        if (g.hero && g.hero.hp !== undefined) {
+          var hp = g.hero.hp
+          if (lastHp !== null && hp < lastHp - 0.5) flash = 1
+          lastHp = hp
+        }
+        flash *= 0.94
+        S.finalMat.uniforms.flash.value = flash
+        renderer.setRenderTarget(S.sceneRT); origRender(scene, camera)
+        S.quad.material = S.brightMat
+        S.brightMat.uniforms.tDiffuse.value = S.sceneRT.texture
+        renderer.setRenderTarget(S.rtA); origRender(S.quadScene, S.quadCam)
+        S.quad.material = S.blurMat
+        S.blurMat.uniforms.tDiffuse.value = S.rtA.texture; S.blurMat.uniforms.dir.value.set(1, 0)
+        renderer.setRenderTarget(S.rtB); origRender(S.quadScene, S.quadCam)
+        S.blurMat.uniforms.tDiffuse.value = S.rtB.texture; S.blurMat.uniforms.dir.value.set(0, 1)
+        renderer.setRenderTarget(S.rtA); origRender(S.quadScene, S.quadCam)
+        S.quad.material = S.finalMat
+        S.finalMat.uniforms.tScene.value = S.sceneRT.texture
+        S.finalMat.uniforms.tBloom.value = S.rtA.texture
+        renderer.setRenderTarget(null); origRender(S.quadScene, S.quadCam)
+      } catch (e) {
+        renderer.render = function (s2, c2) { origRender(s2, c2) }
+        console.warn('[wt] post-fx wyłączony po błędzie:', e)
+        origRender(scene, camera)
+      }
+    }
+    renderer.__wtHooked = true
+    return true
+  }
+  var fxTries = 0
+  var fxTimer = setInterval(function () { if (tryHookRender() || ++fxTries > 600) clearInterval(fxTimer) }, 300)
+
+  // ============================================================
+  // PANEL DEBUG (F3): FPS + draw calls + trójkąty (wbudowany odpowiednik stats.js)
+  // ============================================================
+  var dbgPanel = null
+  function ensureDbgPanel() {
+    if (dbgPanel) return dbgPanel
+    dbgPanel = document.createElement('div')
+    dbgPanel.style.cssText = 'position:fixed;top:8px;left:8px;z-index:900;display:none;background:rgba(0,0,0,.75);border:1px solid #3f3f46;border-radius:6px;padding:8px 12px;font:11px/1.7 monospace;color:#a8e6a3;text-shadow:none;pointer-events:none;white-space:pre'
+    document.body.appendChild(dbgPanel)
+    return dbgPanel
+  }
+  setInterval(function () {
+    if (!dbgPanel || dbgPanel.style.display === 'none') return
+    var g = window.__WT
+    var fps = wtFrames * 2
+    wtFrames = 0
+    var info = (g && g.renderer && g.renderer.info) ? g.renderer.info.render : null
+    dbgPanel.textContent =
+      'FPS: ' + fps + (fps && fps < 30 ? '  ⚠' : '') + '\n' +
+      'draw calls: ' + (info ? info.calls : '?') + '\n' +
+      'trójkąty: ' + (info ? info.triangles : '?') + '\n' +
+      'geometrie: ' + ((g && g.renderer && g.renderer.info.memory) ? g.renderer.info.memory.geometries : '?')
+  }, 500)
+  window.addEventListener('keydown', function (e) {
+    if (e.key === 'F3') {
+      e.preventDefault()
+      var p = ensureDbgPanel()
+      p.style.display = p.style.display === 'none' ? 'block' : 'none'
+    }
+  })
 
   // ============================================================
   // EKRAN TYTUŁOWY (po załadowaniu gry): logo + menu jak z gry
