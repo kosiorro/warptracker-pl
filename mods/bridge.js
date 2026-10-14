@@ -1217,16 +1217,41 @@
   }
 
   // pokaż ekran tytułowy, gdy skończy się ładowanie (intro-overlay znika)
+  // i gdy zamknięty jest wybór zakonu (#class-select) — żeby ekrany się nie nakładały
   var introEl = document.getElementById('intro-overlay')
+
+  function titleSkipped() {
+    try {
+      if (sessionStorage.getItem('wt.skipTitle')) { sessionStorage.removeItem('wt.skipTitle'); return true }
+    } catch (err) {}
+    return false
+  }
+  function classPickOpen() { return !!document.getElementById('class-select') }
+
+  function maybeShowTitle() {
+    if (titleOn || introEl.classList.contains('show')) return
+    if (classPickOpen()) {
+      // wybór zakonu aktywny — poczekaj, aż gracz go potwierdzi (element zniknie)
+      var pickObs = new MutationObserver(function () {
+        if (classPickOpen()) return
+        pickObs.disconnect()
+        // świeży wybór zakonu = gracz właśnie zaczyna grę (nie ma zapisu) → bez menu tytułowego
+        if (titleSkipped() || !localStorage.getItem('wt.save')) return
+        showTitle()
+      })
+      pickObs.observe(document.body, { childList: true, subtree: false })
+      return
+    }
+    if (!titleSkipped()) showTitle()
+  }
+
   if (introEl) {
     new MutationObserver(function () {
       if (introEl.classList.contains('show') || titleOn) return
-      var skip = false
-      try {
-        if (sessionStorage.getItem('wt.skipTitle')) { sessionStorage.removeItem('wt.skipTitle'); skip = true }
-      } catch (err) {}
-      if (!skip) showTitle()
+      maybeShowTitle()
     }).observe(introEl, { attributes: true, attributeFilter: ['class'] })
+    // na wypadek, gdy intro już zniknęło przed startem mostka
+    if (!introEl.classList.contains('show')) setTimeout(maybeShowTitle, 300)
   }
 
   // ============================================================
