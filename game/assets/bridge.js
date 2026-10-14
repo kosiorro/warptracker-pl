@@ -665,11 +665,20 @@
     var g = window.__WT
     if (!dbg || !g || !g.scene || townBuilt()) return false
     var THREE = dbg.THREE
-    if (!THREE) return false
+    if (!THREE) { console.warn('[wt] osada: brak THREE w __WTdebug'); return false }
+    try {
+      return buildTownInner(THREE, g)
+    } catch (e) {
+      console.error('[wt] osada: błąd budowy:', e)
+      return false
+    }
+  }
+
+  function buildTownInner(THREE, g) {
     var scene = g.scene
     var root = new THREE.Group()
     root.name = 'wt-town'
-    root.id = 'wt-town'
+    console.log('[wt] buduję Osadę Żarowarta (v7)…')
 
     var wood = new THREE.MeshStandardMaterial({ color: 0x6e4a2c, roughness: 1 })
     var woodDark = new THREE.MeshStandardMaterial({ color: 0x4a3018, roughness: 1 })
@@ -761,6 +770,7 @@
 
     scene.add(root)
     townDone = true
+    console.log('[wt] Osada Żarowarta zbudowana ✓ (palisada, ognisko, namioty)')
 
     // ognisko: migotanie (lekki interval — nie blokuje pauzy)
     setInterval(function () {

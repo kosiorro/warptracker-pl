@@ -42,11 +42,12 @@
   // odpowiednik modułu debug gry: THREE + instantiate + findBone
   window.__WTdebug = { THREE: m.r, instantiate: m.n, findBone: m.t };
   // panel admina (P): baza przedmiotów + podgląd 3D — osobny moduł
-  await import(new URL('admin.js', import.meta.url).href);
+  var V = 'v7'; // wersja modułów PL — podbij po każdej zmianie, łamie cache przeglądarki
+  await import(new URL('admin.js?' + V, import.meta.url).href);
   // mostek dla osobnej strony admina (admin.html): nadpisania dialogów + live-sync
-  await import(new URL('bridge.js', import.meta.url).href);
+  await import(new URL('bridge.js?' + V, import.meta.url).href);
   // karta postaci (papierowa lalka) + sakwa — C lub I
-  await import(new URL('charsheet.js', import.meta.url).href);
+  await import(new URL('charsheet.js?' + V, import.meta.url).href);
 })().catch(function (e) {
   console.error('wt-pl loader:', e);
   var st = document.getElementById('loading-status');
